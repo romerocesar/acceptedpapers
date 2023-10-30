@@ -1,0 +1,2163 @@
+title,url,abstract,content
+Towards Attack-tolerant Federated Learning via Critical Parameter Analysis,http://arxiv.org/abs/2308.09318,"Federated learning is used to train a shared model in a decentralized way
+without clients sharing private data with each other. Federated learning
+systems are susceptible to poisoning attacks when malicious clients send false
+updates to the central server. Existing defense strategies are ineffective
+under non-IID data settings. This paper proposes a new defense strategy, FedCPA
+(Federated learning with Critical Parameter Analysis). Our attack-tolerant
+aggregation method is based on the observation that benign local models have
+similar sets of top-k and bottom-k critical parameters, whereas poisoned local
+models do not. Experiments with different attack scenarios on multiple datasets
+demonstrate that our model outperforms existing defense strategies in defending
+against poisoning attacks.","Towards Attack-tolerant Federated Learning via Critical Parameter Analysis
+Sungwon Han*1Sungwon Park*1Fangzhao Wu2Sundong Kim3
+Bin Zhu2Xing Xie2Meeyoung Cha4,1
+1KAIST2Microsoft Research Asia3GIST4Institute for Basic Science
+Abstract
+Federated learning is used to train a shared model in a
+decentralized way without clients sharing private data with
+each other. Federated learning systems are susceptible to
+poisoning attacks when malicious clients send false updates
+to the central server. Existing defense strategies are ineffec-
+tive under non-IID data settings. This paper proposes a new
+defense strategy, FedCPA (Federated learning with Criti-
+cal Parameter Analysis) . Our attack-tolerant aggregation
+method is based on the observation that benign local models
+have similar sets of top- kand bottom- kcritical parameters,
+whereas poisoned local models do not. Experiments with
+different attack scenarios on multiple datasets demonstrate
+that our model outperforms existing defense strategies in
+defending against poisoning attacks.
+1. Introduction
+The proliferation of computing devices like mobile phones
+has led to an increase in proprietary user data. The abun-
+dance of user data offers the opportunity to create numer-
+ous applications but also raises concerns about data pri-
+vacy. Federated learning (FL) is a cutting-edge collabora-
+tive technique that addresses the privacy challenge by en-
+abling machine learning on decentralized devices without
+exchanging locally stored data [26]. For example, a promi-
+nent FL model, FedAvg [17], works as follows: Given a
+central server and multiple clients, the central server selects
+a random subset of clients and sends the global model to
+them. Then, each selected client uses its own data to op-
+timize the local model and sends back the model update
+to the central server. The central server takes the average
+of these received updates to construct a new global model.
+This FL framework enables a decentralized system to train
+a globally shared model via aggregating updates from local
+models while preserving data privacy.
+However, the averaging operation used in the central
+server leaves room for poisoning attacks [2, 16] when mali-
+*Equal contribution to this work.cious clients pose as ordinary clients and submit fraudulent
+model updates. Attackers can not only impede the con-
+vergence of model training and degrade performance [23]
+(which is called untargeted attacks ) but they can also
+manipulate model updates by injecting a backdoor into the
+resulting global model without substantially degrading its
+performance [25] (which is called targeted attacks ).
+Several defense strategies have been proposed to elim-
+inate false updates from potentially malicious clients and
+maintain benign updates on FL systems. For instance, one
+idea is to use outlier-resistant statistics such as the median
+or trimmed mean [31, 32] rather than the average in model
+aggregation. Blanchard et al. [3] proposed Krum, which
+removes atypical model updates with low local density
+compared to their k-nearest neighbors. Fung et al. [8]
+and Fu et al. [7] proposed weighted averaging of local
+updates in proportion to each update’s normality level.
+Nevertheless, these defense strategies cannot detect adver-
+saries in so-called non-IID (non-independent, identically
+distributed) situations, where data distributions vary sub-
+stantially among clients. Existing defense strategies project
+model updates as individual Euclidean vectors and evaluate
+their abnormality based on their distances from other model
+updates. Meanwhile, the non-IID property leads to diverse
+benign updates, which makes malicious and benign updates
+indistinguishable in Euclidean space. As a result, existing
+defense strategies become ineffective [2, 19].
+This paper presents FedCPA (Federated learning with
+Critical Parameter Analysis), an attack-tolerant aggregation
+method for FL under non-IID data settings. Inspired by a
+recent observation that not all model parameters contribute
+equally to optimization [6, 28], we assess the importance
+of the model parameters in every client’s update. Our
+analysis shows that benign model updates share similar sets
+of top- kand bottom- kimportant parameters, even under
+non-IID data. However, this pattern is not observed for
+malicious model updates. Based on this observation, we
+propose a new defense strategy tailored for FL systems to
+measure model similarity, which extends beyond the extant
+Euclidean-based similarity and provides an efficient way to
+discard updates from clients that are likely malicious.arXiv:2308.09318v1  [cs.LG]  18 Aug 2023FedCPA consists of two steps: (1) computing the
+normality score of each client’s model concerning param-
+eter importance and (2) aggregating local updates via a
+weighted average to remove the effect of likely-malicious
+updates. In the first step, the importance of each parameter
+is computed by multiplying its value by its change after
+local training. The resulting parameters are then ranked in
+order of importance. Top- kand bottom- kmost important
+parameters are extracted for each client’s model and used
+to compute the similarity among clients’ models. Then,
+we define the normality of the model update to measure
+its similarity with other model updates. Model updates
+that differ from other updates are considered malicious.
+In the second step, outlier local updates are filtered out by
+adjusting their weights regarding their normality scores.
+Our evaluation demonstrates that FedCPA protects
+against both untargeted and targeted attacks better than ex-
+isting methods such as Multi-Krum [3], FoolsGold [8], and
+ResidualBase [7]. We make the following contributions:
+• We empirically show that benign local models in fed-
+erated learning exhibit similar patterns in how param-
+eter importance changes during training. The top and
+bottom parameters have smaller rank order disruptions
+than the medium-ranked parameters.
+• Based on the data observation that holds over non-IID
+cases, we present a new metric for measuring model
+similarity (Eq. 5). With this measure, FedCPA can
+efficiently assess the normality of each local update,
+enabling attack-tolerant aggregation.
+• Extensive experiments demonstrate the superiority
+ofFedCPA in terms of defense performance. For
+example, FedCPA reduces the success rate of targeted
+attacks by a factor of 3 (from 51.4% to 21.9%) on
+CIFAR-10 and by a factor of 2 (from 74.6% to 43.2%)
+on TinyImageNet.
+The proposed model can be used in various federated
+learning contexts as a more robust and attack-tolerant
+decentralized computing framework. Codes are available
+athttps://github.com/Sungwon-Han/FEDCPA .
+2. Related Work
+2.1. Model Poisoning Attacks
+Due to its decentralized nature, federated learning is sus-
+ceptible to model poisoning attacks and allows malicious
+clients to send harmful updates to the central server without
+supervision [27]. As local training data is not shared,
+malicious participants launch attacks without a full under-
+standing of the entire dataset [5]. Model poisoning attacks
+can be categorized into untargeted and targeted attacks.In an untargeted attack scenario, attackers aim to indis-
+criminately degrade the model’s overall performance across
+all classes [22]. Simple and widely used methods of un-
+targeted attack include label-flipping and adding Gaussian
+noise, which can be executed without prior knowledge of
+the entire training data distribution [23]. A label-flipping
+attack involves malicious clients sending false update sig-
+nals by randomly altering the class label of the training
+data [29]. On the other hand, Gaussian noise attacks send
+random noise with the same distribution as the local model
+prior to the attack in place of the benign client updates [5].
+In atargeted attack , the objective of a malicious client is
+to deliberately introduce a backdoor into the global model,
+which predicts a specific target label for any input overlaid
+with the backdoor trigger but otherwise behaves like a nor-
+mal model with a similar overall performance [1, 9, 30].
+The backdoor trigger can be a small square to be blended
+into the original image or a fixed watermark on the im-
+age [4, 15].
+2.2. Defense Strategies in Federated Learning
+Operation based strategy. The main objective of defense
+strategies is to screen harmful updates from malicious
+clients. The first representative line of work involves
+dimension-wise aggregation, which employs outlier-
+resilient operations instead of a simple average. For exam-
+ple,Median aggregates local updates by computing the me-
+dian value for each dimension of the updates [31]. Trimmed
+Mean is another aggregation method that eliminates a
+specified percentage of the smallest and largest values, then
+computes the average of the remaining values [32].
+When the training data is of a non-IID distribution, the
+median aggregation method becomes less effective because
+it overlooks underrepresented updates. To tackle this lim-
+itation, RFA suggests using an approximate geometric me-
+dian operation [20]. ResidualBase , on the other hand, in-
+troduces residual-based aggregation to determine parame-
+ter confidence after calculating the residual of each model
+parameter via a median estimator [7].
+Anomaly detection based strategy. The next line of work
+involves using anomaly detection to identify and remove
+malicious updates during aggregation. One representative
+work is Krum , which uses the Euclidean norm space to iden-
+tify updates far from benign as malicious [3]. In Krum,
+a local model update that shows the highest similarity to
+n−m−2of its neighboring updates is identified as be-
+nign, with mdenoting the anticipated number of malicious
+clients. Multi-Krum extends this idea by selecting multi-
+ple benign local updates iteratively using Krum. Another
+approach, FoolsGold , identifies the coordinated actions of
+targeted attacks [8]. Operating under the assumption that
+malicious clients engaged in a targeted attack exhibit sim-
+ilar update patterns, Foolsgold adjusts the learning rate ofmodel updates, scaling it in proportion to the diversity of
+the updates. Norm Bound excludes clients whose local up-
+dates exceed a certain threshold for the norm, as malicious
+clients tend to produce updates with larger norms [24].
+3. Problem Statement
+Federated Learning. Suppose a set of Nclients in total
+in a federated learning system as Cand a set of training
+sample data in the i-th client as Di(i∈ {1, ..., N}). FL
+aims to train a single global model parameterized as ϕwith-
+out directly sharing the local dataset Diwith others. Given
+loss objective Liin the i-th client and its empirical loss li,
+the main objective for optimizing ϕcan be expressed as
+arg min
+ϕL(ϕ) =Ei∈[1..N][Li(ϕ,Di)],
+where Li(ϕ,Di) =E(x,y)∈Di[li(x, y;ϕ)]. (1)
+Following the literature [8], we choose FedAvg [17] as
+the default setting to optimize Eq. 1 in the following way.
+FedAvg divides each training iteration into multiple steps.
+At the beginning of the t-th iteration ( t≥0), the central
+server randomly selects a subset of clients and distributes
+its global model ϕt. Then, selected clients update their local
+model weights θt
+iwith their dataset Diand send these up-
+dates as ∆t
+i=θt
+i−ϕtto the central server. Then, the central
+server aggregates receive local model updates and modifies
+the global model weight ϕt+1as follows (hereafter called
+thecentral aggregation process ):
+ϕt+1=ϕt+P
+i∈[1..N]|Di| ·∆t
+iP
+i∈[1..N]|Di|. (2)
+This process repeats until the global model converges.
+Threat model. Consider a scenario where Mmalicious
+clients ( M < N ) infiltrate the FL system to disturb or
+manipulate the central aggregation process by transmitting
+false local updates. Because FL systems are decentralized,
+attackers cannot access updates from benign users and
+hence have a limited view of the entire data distribution.
+We consider two different types of poisoning attacks. One
+is untargeted attacks, in which attackers may send Gaussian
+noise to the central server or train the local model with
+randomly swapped labels. Such tampering can harm the
+global model’s performance. The other type is targeted
+attacks, in which attackers send model updates containing
+a backdoor with a carefully designed backdoor trigger.
+This will cause the global model to incorrectly classify test
+samples under a specific target label.
+Attack-tolerant central aggregation. Most FL systems
+assume that all participants are benign and that their lo-
+cal updates are reliable. This assumption leaves the systemvulnerable to attacks that try to alter or manipulate updates
+for malicious purposes. Attack-tolerant central aggregation
+methods have been proposed to mitigate the impact of ma-
+licious updates [7, 31, 32].
+LetCmdenote a set of malicious clients and Cba set
+of benign clients, C=Cm∪ Cb. Then, the objective of
+attack-tolerant central aggregation is to design the aggrega-
+tion function g∗(·), which can be defined as follows,
+ϕt+1=ϕt+P
+i∈[1..N]1(i∈ Cb)·∆t
+i
+N−M
+=ϕt+X
+i∈[1..N]g∗(i)·∆t
+i, (3)
+where 1(i∈ Cb)is an indicator function that becomes one if
+client i∈ Cband zero if client i /∈ Cb. The term |Di|in Eq. 2
+is omitted here to prevent magnifying the effect of false up-
+dates by attackers with increased sizes of their datasets.
+4. Critical Parameter Analysis
+Given the problem statement, our goal, as formulated in
+Eq. 3, is to determine which updates are malicious and neu-
+tralize their impact during the central aggregation process.
+Prior studies used L2distance-based similarity, assuming
+that false updates are positioned far from benign updates
+in the Euclidean space [3, 7]. Such an approach performs
+poorly in the non-IID setting [2], where benign updates be-
+come diverse enough to be separated from malicious up-
+dates. Motivated by a recent study that demonstrated pa-
+rameters play diverse roles in model training [6, 13, 28], we
+adopt an alternative approach to examine parameter impor-
+tance and identify common patterns among benign updates
+distinguishable from malicious updates. Our new defense
+strategy is robust under non-IID data distributions.
+Letθt
+idenote the model parameters of client iat
+communication round t. After the local training, the
+model update is defined as ∆t
+i=θt
+i−ϕt. As originally
+used in [28], we evaluate the importance piof the model
+parameters of client iwith the following equation:
+pi[n] =|∆i[n]·θi[n]|, (4)
+where the notation [n]represents the n-th component value
+of a given vector.
+The role of Eq. 4 is two-fold. First, the magnitude of
+the update provides information about the intensity of the
+learning signal imposed on each parameter for optimiza-
+tion [13]. Second, the magnitude of the weight represents
+how much the parameter contributes to the model’s predic-
+tion [6]. By considering both the update and the weight, we
+can comprehensively assess the importance of each model
+parameter. Specifically, when the value of pi[n]is large, the
+parameter is considered critical and can significantly impact(a) Changes of importance in benign clients
+ (b) Disparity in changes by attacks
+ (c) Disparity in changes with different β
+Figure 1: Analysis of importance-rank changes of parameters in federated learning: (a) Averaged change in importance-ranks
+of parameters in benign local models after one training round with the standard deviation area shaded. (b) Comparison
+of change patterns under two different poisoning attack scenarios, where the disparity is measured by the difference in
+importance-rank changes between benign and poisoned models after one training round. (c) The disparity in change patterns
+of the untargeted attack under varying data heterogeneity determined by β.
+the optimization process. If pi[n]is small, the parameter is
+considered non-critical and is rarely used for training.
+Given a federated learning system with multiple clients
+and parameter importance information of each local model,
+we conduct an analysis to answer the questions below.
+•Q1. Do benign local models exhibit similar patterns
+of changing parameter importance during training?
+•Q2. Are there any differences in the change of
+parameter importance between the training of normal
+and malicious objectives?
+•Q3. If any patterns are discovered, are they persistent
+across different non-IID settings and datasets?
+The first question asks about the common change
+pattern in the importance-ordering of local model param-
+eters among benign clients. To answer this question, we
+conducted multiple rounds of communication in the FL
+system using the CIFAR-10 dataset. For each round t >1,
+the central server shares its global model, ϕt, with clients.
+Clients then record the parameter importance of the shared
+global model ϕtviapt
+global [n] =|∆t[n]·ϕt[n]|, where
+∆t[n] =ϕt[n]−ϕt−1[n]is the change of the global model
+made from the previous t−1round. Note that pt
+global is
+identical for all clients since they receive the same model.
+The parameters were then ordered according to the global
+model’s parameter importance pt
+global (x-axis in Figure 1).
+After the local training, each client icomputes the model’s
+importance again, expressed as pt
+i. We analyzed the
+changes in orderings between pt
+global andpt
+ifor each round
+t >1, and the averaged results are displayed in Fig. 11.
+Figure 1a shows experimental results of importance-rank
+changes in benign clients. We can see that most rank
+1Note that the scale of the y-axis in Fig. 1 lies within [0, 1.1E7], as we
+used the ResNet18 model with 1.1E7 trainable parameters.changes concentrate on parameters of medium importance,
+whereas the top-importance parameters tend to remain sta-
+ble and the bottom-importance parameters tend to change
+less in importance ranks. This finding suggests different
+roles for parameters in the model; The top-importance pa-
+rameters may be less susceptible to changes due to their
+significant role in shaping the model’s predictions. On the
+other hand, the bottom-importance parameters have only a
+small effect on the prediction, and hence they may be ne-
+glected, resulting in fewer importance-rank changes dur-
+ing the optimization process. A similar observation is also
+made in [28] on the role of model parameters.
+The experiment was then repeated in the presence of a
+poisoning attack. We prepared two models derived from the
+same global model: one was trained with a normal objective
+and the other with a malicious objective. The disparity in
+importance-rank changes between the two models was then
+computed for both targeted and untargeted attack scenarios.
+The results are shown in Figure 1b. We can see that the poi-
+soned models for both attack scenarios cause greater pertur-
+bations in the top- and bottom-importance parameters. This
+phenomenon may be explained by the fact that a poisoning
+attack seeks to alter the most critical parameters for disrupt-
+ing model optimization and injecting malicious information
+by awakening the unused parameters (i.e., less important
+parameters) to cause overfitting to noise.
+Finally, we examined if this phenomenon holds for
+various non-IID data settings and datasets. The level of
+non-IIDness was adjusted by the beta hyper-parameter ( β)
+in the Dirichlet distribution of clients. The experimental
+results are shown in Figure 1c and Figure 4 in the Ap-
+pendix. They both confirm that the pattern persists across
+varying levels of non-IIDness (adjusted by the βvalue) and
+multiple datasets. These observations can be summarized
+to answer the initial questions as follows:•A1.When it comes to importance-rank changes of pa-
+rameters, benign local models in FL systems tend to
+have similar top and bottom parameters in terms of
+importance ranks.
+•A2. Poisoned local models in FL systems tend to
+have different sets of parameters with top and bottom
+importance compared with benign models, which can
+either degrade optimization or induce overfitting.
+•A3. The above importance-rank change patterns
+of parameters persist for different levels of data
+heterogeneity and datasets.
+5. Main Defense Approach: FedCPA
+We present an effective defense method against poisoning
+attacks, called FedCPA . Our key idea is to define a new
+model similarity metric through critical parameter analysis
+and measure the normality of each local update based
+on this similarity. The model then attempts to filter out
+and reduce the impact of potentially malicious updates
+using attack-tolerant central aggregation. We describe each
+procedure in detail.
+Defining local model similarity. Given two local models
+and their parameter importance computed by Eq. 4, we
+measure the local model similarity with two criteria:
+top/bottom- kcritical sets similarity and importance rank
+correlation. First, we extract the indices of the top- kand
+bottom- kimportant parameters from each client (i.e., Θtop
+i,
+Θbottom
+i in client i) and compare them by calculating the
+Jaccard similarity between each pair of parameter sets.
+Second, to further assess the similarity of the parameter im-
+portance pattern, we compute the Spearman correlation of
+the importance values between two models for both top- k
+and bottom- kparameter sets. The correlation is calculated
+over the parameter sets that are common in the two models
+(i.e., Θtop
+i∩j= Θtop
+i∩Θtop
+j,Θbottom
+i∩j= Θbottom
+i∩Θbottom
+j ).
+These criteria are derived from our observations that the
+benign local model tends to have similar sets of parameters
+with top and bottom importance, while poisoned models do
+not. The similarity measure between local models θiand
+θjis defined as the following equation:
+sim(θi, θj) =J(Θtop
+i,Θtop
+j) +J(Θbottom
+i,Θbottom
+j)
++ρ(ri(Θtop
+i∩j), rj(Θtop
+i∩j))
++ρ(ri(Θbottom
+i∩j), rj(Θbottom
+i∩j)), (5)
+where J(·,·)denotes the Jaccard similarity and ρ(·,·)de-
+notes the Spearman correlation between two inputs, which
+is normalized to [0, 1] to align the scale. Here, riandrjrep-
+resent the functions that map indices to their ranks in terms
+of parameter importance for clients iandj, respectively.Algorithm 1 Central aggregation process with FedCPA
+Input: Global model weight ϕt, global model weight from
+previous round ϕt−1, a set of local clients Ctwith their
+models θt
+i, and updates ∆t
+i, given index i.
+// Computing parameter importance
+foreach client i∈ Ctdo
+pt
+i[n] =|∆t
+i[n]·θt
+i[n]|in Eq. 4
+Θbottom
+i,Θtop
+i= arg sort( pt
+i)[:k],arg sort( pt
+i)[−k:]
+end
+// Measuring normality score
+foreach client i∈ Ctdo
+foreach client j∈ Ct, j̸=ido
+Θtop
+i∩j= Θtop
+i∩Θtop
+j,Θbottom
+i∩j= Θbottom
+i∩Θbottom
+j
+si,j=sim(θt
+i, θt
+j)in Eq. 5
+end
+N(θt
+i)= sim (θt
+i, ϕt−1) +1
+|Ct|P
+j∈Ctsi,jin Eq. 7
+˜N(θt
+i)= Scale( N(θt
+i))
+λt
+i=Clip0∼1(ln˜N(θt
+i)
+1−˜N(θt
+i)+ 0.5)in Eq. 8
+end
+// Attack-tolerant update
+ϕt+1←ϕt+1P
+i∈Ct1(λt
+i>0)P
+i∈Ctλt
+i·∆t
+iin Eq. 9
+Normality score for local model. Assuming that adver-
+sarial models would have dissimilar patterns of parameter
+importance from other benign models, we regard a model
+with low similarity to others as likely malicious. Given the
+set of clients Ctparticipating in communication round t,
+normality score N(θt
+i)of the local model θt
+ican be defined
+as follows:
+N(θt
+i) =1
+|Ct|X
+j∈Ctsim(θt
+i, θt
+j). (6)
+However, relying solely on similarities among local
+models is susceptible to a Sybil attack, where most clients
+selected at the beginning of the round are malicious by
+chance [8]. In this scenario, the normality score for adver-
+sarial models can be overestimated, as their updates tend to
+be similar. To enhance the stability of the defense, we also
+compare the local model with the global model ϕt−1from
+the previous t−1round, resulting in the following normal-
+ity score,
+N(θt
+i) =sim(θt
+i, ϕt−1) +1
+|Ct|X
+j∈Ctsim(θt
+i, θt
+j). (7)
+Attack-tolerant central aggregation. We aggregate lo-
+cal updates through a weighted average, with the weight λt
+i
+determined by the normality score N(θt
+i). This allows us to
+filter out the effect of likely malicious updates, while pre-
+serving the knowledge gained from likely benign clients’
+updates. To convert normality scores into weights, we scaleMethod CIFAR-10 SVHN TinyImageNet
+(γp= 0.5) ACC(↑) ASR( ↓)ACC ASR ACC ASR
+No Defense 72.1 71.0 93.0 22.2 39.5 96.6
+Median 65.6 77.8 90.7 23.0 32.5 96.1
+Trimmed Mean 70.1 51.4 92.2 20.9 39.3 97.2
+Multi Krum 69.9 63.8 92.1 21.4 37.1 74.6
+FoolsGold 45.5 54.3 79.6 23.5 24.3 92.4
+Norm Bound 68.2 61.2 93.1 20.8 36.6 96.7
+RFA 72.8 56.4 92.3 20.8 37.1 93.9
+ResidualBase 70.6 59.9 93.1 21.1 39.6 96.9
+FedCPA 68.8 21.9 93.3 20.6 30.1 43.2Method CIFAR-10 SVHN TinyImageNet
+(γp= 0.8) ACC(↑) ASR( ↓)ACC ASR ACC ASR
+No Defense 69.3 50.9 92.5 22.0 38.8 96.1
+Median 62.4 70.6 90.0 23.6 31.5 96.2
+Trimmed Mean 71.4 19.0 91.7 21.4 37.9 97.0
+Multi Krum 69.0 40.4 90.7 23.4 36.3 19.0
+FoolsGold 49.1 46.8 69.8 32.3 28.5 69.1
+Norm Bound 64.9 53.1 92.7 20.9 35.7 97.1
+RFA 70.1 44.8 91.8 22.1 36.3 11.4
+ResidualBase 69.9 54.0 92.5 21.9 38.6 96.2
+FedCPA 72.3 12.5 93.1 20.8 38.7 4.8
+Table 1: Comparison of defense performance over three datasets under targeted attack scenarios with different levels of
+pollution ratio γp= 0.5,0.8. ACC and ASR refer to the final accuracy and the attack success rate, respectively. The symbol
+(↑) indicates that a higher value is preferable, while ( ↓) represents the opposite. The best results are marked bold.
+Method ( γp= 0.8)CIFAR-10 SVHN TinyImageNet
+No Defense 69.8 90.6 33.0
+Median 59.8 89.9 28.7
+Trimmed Mean 72.9 91.0 34.1
+Multi Krum 72.7 92.6 35.9
+FoolsGold 18.6 47.6 4.6
+Norm Bound 64.9 90.8 29.3
+RFA 72.6 92.7 36.5
+ResidualBase 73.6 92.1 36.0
+FedCPA 74.9 93.2 36.8Method ( γp= 1.0)CIFAR-10 SVHN TinyImageNet
+No Defense 63.8 86.1 24.4
+Median 56.8 89.6 21.2
+Trimmed Mean 66.2 87.9 27.2
+Multi Krum 73.0 92.6 35.9
+FoolsGold 24.9 41.9 1.3
+Norm Bound 63.5 86.6 24.1
+RFA 71.5 92.4 36.3
+ResidualBase 70.3 91.8 30.5
+FedCPA 74.4 93.2 34.9
+Table 2: Comparison of defense performance over three datasets under label flipping attack scenarios with different levels of
+pollution ratio γp= 0.8,1.0. The best results are marked bold.
+each score to the range from 0 to 1 with Min-Max normal-
+ization, i.e., ˜N(θt
+i)←Scale (N(θt
+i)). Following the litera-
+ture [8], we apply the inverse sigmoid function to a normal-
+ized score to enhance the differentiation of weight values
+and avoid over-penalization of low, non-zero similarity val-
+ues on benign clients, resulting in the following weight,
+λt
+i=Clip0∼1(ln˜N(θt
+i)
+1−˜N(θt
+i)+ 0.5). (8)
+where Clip0∼1(·)denotes a function that rounds and clips
+any values exceeding the 0-1 range. Given the local up-
+date from client ias∆i, the global model at communication
+round tis updated as follows:
+ϕt+1←ϕt+1P
+i∈Ct1(λt
+i>0)X
+i∈Ctλt
+i·∆t
+i, (9)
+where 1(λt
+i>0)is an indicator function that produces one
+ifλt
+iis larger than zero and zero otherwise. The overall
+procedure of FedCPA is described in the Algorithm 1.6. Experiments
+We evaluate the effectiveness of FedCPA in defending
+against several attack scenarios over multiple datasets.
+Component analyses are conducted to confirm the con-
+tribution of each component to robustness under varying
+simulation hyper-parameters.
+6.1. Defense Performance Evaluation
+Data. Three benchmark datasets on image classification
+tasks are utilized in our experiment: (1) CIFAR-10 [11] in-
+cludes 60,000 samples of 32x32 pixels with 10 classes; (2)
+SVHN [18] includes 73,257 training samples and 26,032
+test samples of 32x32 sized digits; (3) TinyImageNet [12]
+contains 100,000 samples from 200 classes.
+In our experiments, the non-IID property of feder-
+ated learning in the three datasets is simulated using the
+Dirichlet distribution, following previous works [10, 14].
+The Dirichlet distribution can be denoted as Dir(N, β),
+where Nis the total number of clients and βrefers to the
+parameter that adjusts the level of heterogeneity in the
+decentralized data distributions. A lower value of βresults
+in greater non-IIDness. We set Nandβto 20 and 0.5 as
+default values, respectively.Method CIFAR-10 SVHN TinyImageNet
+No Defense 32.7 47.8 2.1
+Median 67.8 91.5 28.8
+Trimmed Mean 55.6 72.5 12.1
+Multi Krum 52.8 68.4 15.0
+FoolsGold 13.9 6.7 0.5
+Norm Bound 28.2 42.9 1.2
+RFA 72.0 92.2 35.8
+ResidualBase 74.6 93.7 37.0
+FedCPA 74.8 93.6 36.1
+Table 3: Accuracy (%) under the Gaussian noise attack over
+three datasets. The best results are marked bold.
+Implementation details. We set the number of commu-
+nication rounds to 100, with one epoch of local training per
+round. Following the literature [10, 14], we use ResNet18
+as the default backbone network. The SGD optimizer
+is employed. The learning rate, momentum, and weight
+decay parameter for the optimizer are set to 0.01, 0.9, and
+1e-5. The batch size is set to 64. The hyper-parameter k
+for top and bottom- kparameter sets is set to 0.01 (1%).
+To simulate a more realistic federated setting, half of the
+clients (i.e., N/2) are randomly chosen in each round of
+training. Data augmentation techniques such as random
+crop, horizontal flip, and color jitter are applied during the
+local training. In the case of the targeted attack, we follow
+the original literature [9] and generate a noise input pattern
+called backdoor. The size of the backdoor is set to 5 ×5,
+and its location is in the bottom-right corner of the images.
+For the untargeted Gaussian attack, we set the standard
+deviation of the Gaussian noise to 0.05.
+Baselines. A total of eight baselines are compared: (1)
+No Defense represents the classical FedAvg algorithm
+without any consideration of attack scenarios; (2) Median
+and (3) Trimmed Mean [31, 32] utilize the outlier-resistant
+statistics, mean and trimmed mean of local updates, for
+aggregation; (4) Multi Krum [3] iteratively selects a likely-
+benign local update with the lowest Euclidean distance
+from other updates; (5) FoolsGold [8] identifies grouped
+actions of attacks by inspecting similarity among local up-
+dates; (6) Norm Bound [24] filters out the updates whose
+norm is above a predefined threshold; (7) RFA [20] applies
+the geometric median operation for robust aggregation; (8)
+Residual Base [7] introduces a repeated median estimator
+to compute the confidence of each update.
+For all baselines, we followed the original implementa-
+tions and hyper-parameter settings. The confidence interval
+and clipping threshold in the ResidualBase algorithm
+are set to 2.0 and 0.05, respectively. In RFA, we set the
+smoothing parameter to 1e-6 and the maximum number of
+Weiszfeld iterations to 100.SetupTargeted Label flipping GaussianTotalACC ASR ACC ACC
+No Defense 2.8 6.2 6.5 7.0 5.6
+Median 7.8 7.5 7.5 4.0 6.7
+Trimmed Mean 4.2 4.7 4.8 5.3 4.8
+Multi Krum 5.7 4.7 2.8 5.7 4.7
+FoolsGold 9.0 5.5 9.0 9.0 8.1
+Norm Bound 5.2 5.5 6.8 8.0 6.4
+RFA 3.8 3.7 2.7 3.0 3.3
+ResidualBase 2.7 6.0 3.5 1.3 3.4
+FedCPA 3.2 1.0 1.3 1.7 1.8
+Table 4: Performance comparison summaries among
+defense strategies. Averaged rank for each evaluation
+metric under different attack scenarios, including both
+untargeted and targeted attacks, is reported. Our FedCPA
+presents superb defense performance.
+Evaluation. All methods are assessed under the same ex-
+perimental settings (e.g., β, the number of clients, commu-
+nication rounds, and epochs for local training). Given a total
+ofNclients, we set 20% of the clients to play an adversarial
+role as default. Three attack scenarios are evaluated, one for
+targeted and two for untargeted attacks. The targeted attack
+injects a crafted backdoor trigger pattern into some training
+images and changes their labels to the target class to manip-
+ulate the model training. The untargeted attacks consist of
+the label flipping attack, which randomly alters the labels to
+generate false update signals [29], and the Gaussian noise
+attack, which sends Gaussian noise as an update [5]. For
+both the targeted and label flipping attacks, experiments
+were conducted with two different levels of pollution ratio
+(γp), representing the fraction of poisoned samples added
+to the dataset. In the targeted attack experiments, we use
+a pollution ratio of 0.5 and 0.8, while a pollution ratio of
+0.8 and 1.0 is used in the label flipping attack experiments.
+As an evaluation metric, the final accuracy on the test set is
+reported for the untargeted attack scenarios, while both the
+attack success rate and the final accuracy are reported for
+the targeted attack scenario. All measures are calculated by
+averaging the last ten rounds of results.
+Results. Tables 1-4 present the evaluation results and
+their summaries for different attack scenarios. FedCPA
+shows the best or comparable classification accuracy and
+attack success rate against other defense strategies over all
+datasets. Our method consistently performs satisfactorily
+against all types of attacks, whereas some baselines may
+struggle against specific attacks (e.g., ResidualBase in
+the targeted attack scenario). Notably, FedCPA reduces
+the success rate of targeted attacks by a factor of 2 to 4
+compared to other baselines on the CIFAR-10 and TinyIm-(a) Effect of the ratio of attackers
+ (b) Effect of the level of non-IIDness
+ (c) Effect of the number of clients
+Figure 2: Robustness test results against targeted attacks on CIFAR-10 with varying experimental settings. The results
+demonstrate that FedCPA consistently achieves the best defense performance (lowest ASR) compared with the baselines.
+SetupTargeted Untargeted
+ACC ASR ACC
+All components 72.3 12.5 74.9
+without topk 70.4 18.9 74.0
+without bottomk 60.5 36.8 67.6
+without global 68.8 24.1 74.8
+without local 65.0 20.2 72.4
+Table 5: Ablation study results of FedCPA on CIFAR-10.
+The best results are marked bold. Our method with full
+components reports the best defense performance against
+both targeted and untargeted attacks.
+ageNet datasets. These results highlight the effectiveness
+of our method in providing robustness for FL systems.
+6.2. Component Analysis
+Ablation study. We conduct an ablation study to evaluate
+the contribution of each component in our full model. The
+following variations are compared: (1) without topk only
+considers and compares parameters of bottom- kimportance
+to compute the normality score of models, while (2) without
+bottomk is vice-versa; (3) without global omits the simi-
+larity term in the normality score between the local model
+and the global model from the previous round (Eq. 6); (4)
+without local only utilizes global model similarity for the
+normality measure (i.e., N(θt
+i) =sim(θt
+i, ϕt−1)).
+Table 5 shows that the full model with all components
+performs the best against both targeted and untargeted at-
+tacks (i.e., label flipping attacks) among all variations,
+which implies that each component plays an important role
+in detecting malicious updates. Interestingly, without con-
+sidering the bottom- kimportant parameters, the ablation
+study showed the greatest decrease in defense performance
+among all the ablations. These results support our hypoth-
+esis that poisoning attacks cause a local model to overfit
+maliciousness by utilizing unused parameters. Therefore,Top/bottom- kratioTargeted Untargeted
+ACC ASR ACC
+k= 0.005 (0.5%) 61.0 63.4 71.4
+k= 0.01 (1%) 72.3 12.5 74.9
+k= 0.02 (2%) 67.7 15.6 74.0
+k= 0.05 (5%) 60.2 51.6 74.3
+Table 6: Hyper-parameter analysis under both targeted and
+untargeted attacks on CIFAR-10 with different values of k.
+simply focusing on the bottom- kimportant parameters is
+also effective in detecting adversarial clients.
+Robustness test. Next, we conduct experiments in set-
+tings with varying key experimental parameters to assess
+the robustness of our approach. These include (a) the num-
+ber of malicious clients |Cm|, (b) the total number of partic-
+ipating clients N, and (c) the degree of non-IIDness, con-
+trolled by βin the Dirichlet distribution.
+The performance comparison between FedCPA and the
+baselines on the CIFAR-10 dataset is shown in Figure 2.
+Only the results for the targeted attack scenario are reported
+due to the space limitation. More results can be found in
+the appendix. We can see that, under various experimental
+settings, FedCPA consistently demonstrates superior
+defense performance.
+Hyper-parameter analysis. We investigate the effect
+of hyper-parameter kon defense performance. Hyper-
+parameter kdetermines the proportion of model parameters
+selected to create the parameter sets Θtop
+iandΘbottom
+i (i.e.,
+the top- kand bottom- kmost important parameters) for each
+client i. The smaller k, the fewer parameters are compared
+to compute the normality score of the model.
+The results for various values of kare presented in
+Table 6. Our method demonstrates satisfactory results for
+most measures under both targeted and untargeted attackFigure 3: Qualitative analysis under a targeted attack scenario over TinyImagenet, where the highlighted part visualizes how
+the model recognizes class characteristics based on the Grad-CAM algorithm.
+(i.e., label flipping attack) scenarios when kis within a
+reasonable range of 1-2%. However, setting kto a value too
+small or too large significantly decreases the performance.
+This is because the normality measure with a small kmay
+not have enough evidence to distinguish malicious updates,
+while the measure with a large kcan be disturbed by the
+importance changes caused by data heterogeneity.
+Qualitative Analysis We also perform a qualitative
+analysis to assess how effectively FedCPA can filter out
+malicious knowledge during training under targeted attack
+scenarios. Figure 3 compares the performance of different
+defense strategies in interpreting class characteristics after
+training. To evaluate each model’s interpretation, we
+corrupted test set images with a small patch of noise used
+by attackers and used the Grad-CAM algorithm [21] to
+visualize the model’s attention for each input. Blue-framed
+images represent success cases randomly sampled from
+the dataset, while red-framed images represent failure
+cases. Our method tends to extract key features from
+the image compared to other cases where the model is
+contaminated by malicious knowledge and only focuses
+on the injected noise patch. Even in failure cases, our
+approach gives attention to other visual traits along withthe noise, demonstrating its robustness against attacks.
+7. Conclusion
+We presented FedCPA , a defense strategy against poison-
+ing attacks in federated learning systems. Our method is
+based on the observation that benign local models tend to
+have similar sets of important parameters, while adversarial
+models do not. To distinguish malicious updates, we pro-
+pose a new normality measure that considers the pattern of
+important parameters in local models. Then, we aggregate
+local updates via a weighted average, where the weight of a
+local update is determined by its normality score. Extensive
+experiments with both targeted and untargeted attack sce-
+narios on multiple datasets demonstrate the effectiveness of
+FedCPA in defending against poisoning attacks. Our work
+contributes to the ongoing efforts on attack-tolerant feder-
+ated learning and provides new insights for future research.
+Acknowledgements. This research was supported by the In-
+stitute for Basic Science (IBS-R029-C2). Sungwon Han, Sungwon
+Park, and Meeyoung Cha were supported by the National Research
+Foundation of Korea (NRF) grant (RS-2022-00165347). Sundong
+Kim also received the NRF grant funded by the Ministry of Sci-
+ence and ICT (RS-2023-00240062).References
+[1] Eugene Bagdasaryan, Andreas Veit, Yiqing Hua, Deborah
+Estrin, and Vitaly Shmatikov. How to backdoor federated
+learning. In Proceedings of AISTATS , pages 2938–2948.
+PMLR, 2020. 2
+[2] Gilad Baruch, Moran Baruch, and Yoav Goldberg. A little is
+enough: Circumventing defenses for distributed learning. In
+Advances in NeurIPS , volume 32, 2019. 1, 3
+[3] Peva Blanchard, El Mahdi El Mhamdi, Rachid Guer-
+raoui, and Julien Stainer. Machine learning with adver-
+saries: Byzantine tolerant gradient descent. In Advances in
+NeurIPS , volume 30, 2017. 1, 2, 3, 7
+[4] Xinyun Chen, Chang Liu, Bo Li, Kimberly Lu, and Dawn
+Song. Targeted backdoor attacks on deep learning systems
+using data poisoning. arXiv preprint arXiv:1712.05526 ,
+2017. 2
+[5] Minghong Fang, Xiaoyu Cao, Jinyuan Jia, and Neil Gong.
+Local model poisoning attacks to {Byzantine-Robust }fed-
+erated learning. In Proceedings of USENIX Security , pages
+1605–1622, 2020. 2, 7
+[6] Jonathan Frankle and Michael Carbin. The lottery ticket hy-
+pothesis: Finding sparse, trainable neural networks. In Pro-
+ceedings of ICLR , 2019. 1, 3
+[7] Shuhao Fu, Chulin Xie, Bo Li, and Qifeng Chen. Attack-
+resistant federated learning with residual-based reweighting.
+arXiv preprint arXiv:1912.11464 , 2019. 1, 2, 3, 7
+[8] Clement Fung, Chris JM Yoon, and Ivan Beschastnikh. The
+limitations of federated learning in sybil settings. In Pro-
+ceedings of RAID , 2020. 1, 2, 3, 5, 6, 7
+[9] Tianyu Gu, Brendan Dolan-Gavitt, and Siddharth Garg. Bad-
+nets: Identifying vulnerabilities in the machine learning
+model supply chain. arXiv preprint arXiv:1708.06733 , 2017.
+2, 7, 11
+[10] Sungwon Han, Sungwon Park, Fangzhao Wu, Sundong Kim,
+Chuhan Wu, Xing Xie, and Meeyoung Cha. Fedx: Unsuper-
+vised federated learning with cross knowledge distillation. In
+Proceedings of ECCV , pages 691–707, 2022. 6, 7, 11
+[11] Alex Krizhevsky, Geoffrey Hinton, et al. Learning multiple
+layers of features from tiny images. 2009. 6
+[12] Ya Le and Xuan Yang. Tiny imagenet visual recognition
+challenge. Stanford CS 231N , 7(7):3, 2015. 6
+[13] Namhoon Lee, Thalaiyasingam Ajanthan, and Philip Torr.
+Snip: Single-shot network pruning based on connection sen-
+sitivity. In Proceedings of ICLR , 2019. 3
+[14] Qinbin Li, Bingsheng He, and Dawn Song. Model-
+contrastive federated learning. In Proceedings of CVPR ,
+pages 10713–10722, 2021. 6, 7, 11
+[15] Yunfei Liu, Xingjun Ma, James Bailey, and Feng Lu. Reflec-
+tion backdoor: A natural backdoor attack on deep neural net-
+works. In Proceedings of ECCV , pages 182–199. Springer,
+2020. 2
+[16] Lingjuan Lyu, Han Yu, and Qiang Yang. Threats to federated
+learning: A survey. arXiv preprint arXiv:2003.02133 , 2020.
+1
+[17] Brendan McMahan, Eider Moore, Daniel Ramage, Seth
+Hampson, and Blaise Aguera y Arcas. Communication-efficient learning of deep networks from decentralized data.
+InProceedings of AISTATS , pages 1273–1282, 2017. 1, 3
+[18] Yuval Netzer, Tao Wang, Adam Coates, Alessandro Bis-
+sacco, Bo Wu, and Andrew Y Ng. Reading digits in natural
+images with unsupervised feature learning. 2011. 6
+[19] Sungwon Park, Sungwon Han, Fangzhao Wu, Sundong Kim,
+Bin Zhu, Xing Xie, and Meeyoung Cha. Feddefender:
+Client-side attack-tolerant federated learning. arXiv preprint
+arXiv:2307.09048 , 2023. 1
+[20] Krishna Pillutla, Sham M Kakade, and Zaid Harchaoui. Ro-
+bust aggregation for federated learning. IEEE Transactions
+on Signal Processing , 70:1142–1154, 2022. 2, 7
+[21] Ramprasaath R Selvaraju, Michael Cogswell, Abhishek Das,
+Ramakrishna Vedantam, Devi Parikh, and Dhruv Batra.
+Grad-cam: Visual explanations from deep networks via
+gradient-based localization. In Proceedings of ICCV , pages
+618–626, 2017. 9
+[22] Ali Shafahi, W Ronny Huang, Mahyar Najibi, Octavian Su-
+ciu, Christoph Studer, Tudor Dumitras, and Tom Goldstein.
+Poison frogs! targeted clean-label poisoning attacks on neu-
+ral networks. In Advances in NeurIPS , volume 31, 2018. 2
+[23] Jacob Steinhardt, Pang Wei W Koh, and Percy S Liang. Cer-
+tified defenses for data poisoning attacks. In Advances in
+NeurIPS , volume 30, 2017. 1, 2
+[24] Ziteng Sun, Peter Kairouz, Ananda Theertha Suresh, and
+H Brendan McMahan. Can you really backdoor federated
+learning? arXiv preprint arXiv:1911.07963 , 2019. 3, 7
+[25] Brandon Tran, Jerry Li, and Aleksander Madry. Spectral
+signatures in backdoor attacks. Advances in NeurIPS , 31,
+2018. 1
+[26] Jianyu Wang, Zachary Charles, Zheng Xu, Gauri Joshi,
+H Brendan McMahan, Maruan Al-Shedivat, Galen Andrew,
+Salman Avestimehr, Katharine Daly, Deepesh Data, et al.
+A field guide to federated optimization. arXiv preprint
+arXiv:2107.06917 , 2021. 1
+[27] Chuhan Wu, Fangzhao Wu, Tao Qi, Yongfeng Huang, and
+Xing Xie. Fedattack: Effective and covert poisoning attack
+on federated recommendation via hard sampling. In Pro-
+ceedings of ACM SIGKDD , 2022. 2
+[28] Xiaobo Xia, Tongliang Liu, Bo Han, Chen Gong, Nannan
+Wang, Zongyuan Ge, and Yi Chang. Robust early-learning:
+Hindering the memorization of noisy labels. In Proceedings
+of ICLR , 2021. 1, 3, 4
+[29] Han Xiao, Huang Xiao, and Claudia Eckert. Adversarial la-
+bel flips attack on support vector machines. In Proceedings
+of ECAI , pages 870–875. IOS Press, 2012. 2, 7
+[30] Chulin Xie, Keli Huang, Pin-Yu Chen, and Bo Li. Dba: Dis-
+tributed backdoor attacks against federated learning. In Pro-
+ceedings of ICLR , 2020. 2
+[31] Cong Xie, Oluwasanmi Koyejo, and Indranil Gupta.
+Generalized Byzantine-tolerant SGD. arXiv preprint
+arXiv:1802.10116 , 2018. 1, 2, 3, 7
+[32] Dong Yin, Yudong Chen, Ramchandran Kannan, and Peter
+Bartlett. Byzantine-robust distributed learning: Towards op-
+timal statistical rates. In Proceedings of ICML , pages 5650–
+5659, 2018. 1, 2, 3, 7(a) CIFAR-10
+ (b) SVHN
+ (c) TinyImageNet
+Figure 4: Comparison of change patterns over three datasets under two different poisoning attack scenarios, untargeted
+and targeted attack, where the disparity is measured by the difference in changes of importance rank between benign and
+poisoned models after one training round.
+A. Appendix
+A.1. Release & Implementation details
+We adopt ResNet18 as the default backbone architecture, building
+upon prior research in federated learning [14, 10]. In the case of
+the targeted attack, we follow the original literature [9] and gener-
+ate a noise input pattern called a backdoor. The size of the back-
+door is set to 5 ×5, and its location is in the bottom-right corner of
+the images. For the untargeted Gaussian attack, we set the standard
+deviation of the Gaussian noise to 0.05.
+We follow the original works’ implementations and hyper-
+parameter settings to reproduce all baselines. For Multi-Krum
+and Norm Bounding algorithms, we assume the central server al-
+ready knows the upper bound of attacker numbers when decid-
+ing on hyper-parameters. The confidence interval and clipping
+threshold in the ResidualBase algorithm are set to 2.0 and 0.05,
+respectively. We calculate the geometric mean for RFA by set-
+ting the smoothing parameter to 1e-6 and the maximum number
+of Weiszfeld iterations to 100. More details on implementations
+are at https://github.com/Sungwon-Han/FEDCPA .
+A.2. Time Complexity Analysis
+For all experiments, we utilized four A100 GPUs. Table 7 com-
+pares the time costs in seconds of every defense strategy per each
+round of training. Note that FedCPA is not a huge burden and
+only took 10% more processing time than the classical FedAvg
+algorithm (i.e., No Defense).
+A.3. Extra Results on Critical Parameter Analysis
+In Section 4, we have shown that benign and poisoned local
+models exhibit distinct patterns in terms of parameter importance,
+with the poisoned model causing more significant disruptions to
+the top and bottom parameters. We conducted the same analysis
+across different datasets to validate our observation. The results of
+our analysis are presented in Figure 4, which compares the change
+patterns in importance rank between benign and poisoned models
+under two different attack scenarios, untargeted and targeted
+attacks. For the untargeted attack scenario, we used the label
+flipping attack method. After one training round, We measure
+the disparity in importance rank between benign and poisonedMethod Time costs in seconds
+No Defense 87
+Median 86
+Trimmed Mean 87
+Multi Krum 87
+FoolsGold 90
+Norm Bound 86
+RFA 91
+ResidualBase 185
+FedCPA 96
+Table 7: Comparison on time complexity among defense
+strategies against poisoning attacks. The CIFAR-10 dataset
+is used for the analysis.
+models. The results demonstrate that our observation remains
+consistent across the various datasets.
+A.4. Extra Results on Robustness Tests
+We evaluate the robustness of FedCPA through experiments con-
+ducted under different settings, varying key simulation parameters
+such as (a) the number of malicious clients |Cm|, (b) the total num-
+ber of participating clients N, and (c) the degree of non-IIDness,
+controlled by the βparameter in the Dirichlet distribution. A
+lower βvalue results in a higher level of non-IIDness.
+This section presents additional comparison results among
+different defense strategies under an untargeted attack scenario
+(i.e., label flipping attack) on the CIFAR-10 dataset. Results
+presented in Figure 5 show that FedCPA consistently performs
+comparably well despite variations in simulation parameters.
+A.5. Full Results on Performance Evaluation
+Table 8-12 shows the complete evaluation results on defense
+performance over three datasets under various poisoning attack
+scenarios: targeted attack with γp= 0.5,0.8, untargeted label
+flipping attack with γp= 0.8,1.0, and untargeted Gaussian
+attack. The results are obtained by averaging over the last ten
+rounds and are reported with mean and standard deviation values.(a) Effect of the ratio of attackers
+ (b) Effect of the level of non-IIDness
+ (c) Effect of the number of clients
+Figure 5: Robustness test results under label flipping attack across different simulation hyper-parameters: (a) the attacker
+ratio, (b) the level of non-IIDness, and (c) the number of clients over the CIFAR-10 dataset.
+Method CIFAR-10 SVHN TinyImageNet
+(γp= 0.5) ACC ASR ACC ASR ACC ASR
+No Defense 72.1±3.07 71.0 ±0.61 93.0±0.48 22.2 ±12.02 39.5±2.71 96.6 ±0.41
+Median 65.6±3.54 77.8 ±1.09 90.7±0.44 23.0 ±7.02 32.5±3.43 96.1 ±0.58
+Trimmed Mean 70.1±3.15 51.4 ±0.82 92.2±0.57 20.9 ±20.66 39.3±1.13 97.2 ±0.26
+Multi Krum 69.9±0.89 63.8 ±1.24 92.1±0.82 21.4 ±10.88 37.1±2.85 74.6 ±6.93
+FoolsGold 45.5±12.24 54.3 ±18.25 79.6±5.32 23.5 ±36.78 24.3±7.37 92.4 ±14.82
+Norm Bound 68.2±4.12 61.2 ±25.00 93.1±0.69 20.8 ±0.91 36.6±0.38 96.7 ±0.69
+RFA 72.8±3.09 56.4 ±13.52 92.3±1.09 20.8 ±1.57 37.1±0.48 93.9 ±0.63
+ResidualBase 70.6±3.12 59.9 ±0.61 93.1±0.34 21.1 ±15.45 39.6±1.27 96.9 ±0.19
+FedCPA 68.8±3.74 21.9 ±0.73 93.3±9.36 20.6 ±2.69 30.1±1.51 43.2 ±44.66
+Table 8: Comparison of defense performance over three datasets under targeted attack scenarios with pollution ratio γp= 0.5.
+Mean and standard deviation over ten last rounds are reported.
+Method CIFAR-10 SVHN TinyImageNet
+(γp= 0.8) ACC ASR ACC ASR ACC ASR
+No Defense 69.3±3.74 50.9 ±25.09 92.5±0.93 22.0 ±2.21 38.8±1.12 96.1 ±1.34
+Median 62.4±3.32 70.6 ±16.51 90.0±1.53 23.6 ±3.39 31.5±0.99 96.2 ±0.59
+Trimmed Mean 71.4±2.77 19.0 ±10.29 91.7±1.25 21.4 ±1.78 37.9±1.12 97.0 ±0.81
+Multi Krum 69.0±2.21 40.4 ±21.85 90.7±2.33 23.4 ±4.06 36.3±1.78 19.0 ±13.91
+FoolsGold 49.1±9.46 46.8 ±34.83 69.8±24.56 32.3 ±27.72 28.5±4.27 69.1 ±43.20
+Norm Bound 64.9±4.28 53.1 ±30.29 92.7±1.31 20.9 ±1.42 35.7±1.00 97.1 ±0.83
+RFA 70.1±3.37 44.8 ±21.58 91.8±1.44 22.1 ±2.01 36.3±1.05 11.4 ±5.80
+ResidualBase 69.9±3.59 54.0 ±27.50 92.5±0.81 21.9 ±2.34 38.6±0.47 96.2 ±0.81
+FedCPA 72.3±0.88 12.5 ±1.02 93.1±1.02 20.8 ±1.35 38.7±0.63 4.8 ±1.40
+Table 9: Comparison of defense performance over three datasets under targeted attack scenarios with pollution ratio γp= 0.8.
+Mean and standard deviation over ten last rounds are reported.Method ( γp= 0.8)CIFAR-10 SVHN TinyImageNet
+No Defense 69.8±3.49 90.6 ±1.80 33.0 ±4.76
+Median 59.8±3.16 89.9 ±1.55 28.7 ±4.73
+Trimmed Mean 72.9±3.47 91.0 ±1.49 34.1 ±3.73
+Multi Krum 72.7±3.61 92.6 ±0.99 35.9 ±2.22
+FoolsGold 18.6±7.53 47.6 ±19.76 4.6 ±3.36
+Norm Bound 64.9±4.19 90.8 ±2.06 29.3 ±5.18
+RFA 72.6±2.31 92.7 ±0.96 36.5 ±0.78
+ResidualBase 73.6±3.40 92.1 ±1.03 36.0 ±3.38
+FedCPA 74.9±3.30 93.2 ±0.72 36.8 ±1.53
+Table 10: Comparison of defense performance over three datasets under label flipping attack scenarios with pollution ratio
+γp= 0.8. Mean and standard deviation over ten last rounds are reported.
+Method ( γp= 1.0)CIFAR-10 SVHN TinyImageNet
+No Defense 63.8±5.85 86.1 ±5.21 24.4 ±8.94
+Median 56.8±7.23 89.6 ±2.49 21.2 ±8.71
+Trimmed Mean 66.2±5.12 87.9 ±3.97 27.2 ±8.25
+Multi Krum 73.0±3.78 92.6 ±1.42 35.9 ±3.10
+FoolsGold 24.9±10.72 41.9 ±17.53 1.3 ±1.60
+Norm Bound 63.5±4.45 86.6 ±7.05 24.1 ±8.86
+RFA 71.5±2.66 92.4 ±1.06 36.3 ±1.12
+ResidualBase 70.3±3.95 91.8 ±1.38 30.5 ±8.23
+FedCPA 74.4±2.85 93.2 ±0.57 34.9 ±2.18
+Table 11: Comparison of defense performance over three datasets under label flipping attack scenarios with pollution ratio
+γp= 1.0. Mean and standard deviation over ten last rounds are reported.
+Method CIFAR-10 SVHN TinyImageNet
+No Defense 32.7±4.18 47.8 ±8.72 2.1 ±1.09
+Median 67.8±4.30 91.5 ±1.21 28.8 ±3.44
+Trimmed Mean 55.6±4.38 72.5 ±9.72 12.1 ±5.63
+Multi Krum 52.8±5.86 68.4 ±13.72 15.0 ±4.55
+FoolsGold 13.9±4.13 6.7 ±0.00 0.5 ±0.08
+Norm Bound 28.2±2.49 42.9 ±10.39 1.2 ±0.67
+RFA 72.0±2.85 92.2 ±0.49 35.8 ±0.80
+ResidualBase 74.6±2.11 93.7 ±0.39 37.0 ±1.05
+FedCPA 74.8±2.42 93.6 ±0.58 36.1 ±1.37
+Table 12: Comparison of defense performance over three datasets under Gaussian noise attack scenarios. Mean and standard
+deviation over ten last rounds are reported."
+Stochastic Segmentation with Conditional Categorical Diffusion Models,http://arxiv.org/abs/2303.08888,"Semantic segmentation has made significant progress in recent years thanks to
+deep neural networks, but the common objective of generating a single
+segmentation output that accurately matches the image's content may not be
+suitable for safety-critical domains such as medical diagnostics and autonomous
+driving. Instead, multiple possible correct segmentation maps may be required
+to reflect the true distribution of annotation maps. In this context,
+stochastic semantic segmentation methods must learn to predict conditional
+distributions of labels given the image, but this is challenging due to the
+typically multimodal distributions, high-dimensional output spaces, and limited
+annotation data. To address these challenges, we propose a conditional
+categorical diffusion model (CCDM) for semantic segmentation based on Denoising
+Diffusion Probabilistic Models. Our model is conditioned to the input image,
+enabling it to generate multiple segmentation label maps that account for the
+aleatoric uncertainty arising from divergent ground truth annotations. Our
+experimental results show that CCDM achieves state-of-the-art performance on
+LIDC, a stochastic semantic segmentation dataset, and outperforms established
+baselines on the classical segmentation dataset Cityscapes.","Stochastic Segmentation with Conditional Categorical Diffusion Models
+Lukas Zbinden∗Lars Doorenbos∗Theodoros Pissas
+Adrian Thomas Huber Raphael Sznitman Pablo M ´arquez-Neila
+University of Bern, Bern, Switzerland
+{lukas.zbinden,lars.doorenbos,theodoros.pissas,raphael.sznitman,pablo.marquez }@unibe.ch
+Abstract
+Semantic segmentation has made significant progress in
+recent years thanks to deep neural networks, but the com-
+mon objective of generating a single segmentation output
+that accurately matches the image’s content may not be
+suitable for safety-critical domains such as medical diag-
+nostics and autonomous driving. Instead, multiple possi-
+ble correct segmentation maps may be required to reflect
+the true distribution of annotation maps. In this context,
+stochastic semantic segmentation methods must learn to
+predict conditional distributions of labels given the image,
+but this is challenging due to the typically multimodal distri-
+butions, high-dimensional output spaces, and limited anno-
+tation data. To address these challenges, we propose a con-
+ditional categorical diffusion model (CCDM) for seman-
+tic segmentation based on Denoising Diffusion Probabilis-
+tic Models. Our model is conditioned to the input image,
+enabling it to generate multiple segmentation label maps
+that account for the aleatoric uncertainty arising from di-
+vergent ground truth annotations. Our experimental results
+show that CCDM achieves state-of-the-art performance on
+LIDC, a stochastic semantic segmentation dataset, and out-
+performs established baselines on the classical segmenta-
+tion dataset Cityscapes.
+1. Introduction
+Semantic segmentation has significantly progressed in
+recent years due to powerful deep neural networks. For
+most methods, the key objective is to generate a single seg-
+mentation output that accurately matches the image’s con-
+tent. However, this may not be suitable for safety-critical
+domains such as medical diagnostics and autonomous driv-
+ing, as images in these applications often suffer from inher-
+ent ambiguity or annotations that have differences in opin-
+ion. In these cases, generating a single coherent segmen-
+tation may be hopeless to fully describe the set of correct
+*Equal contribution
+Ground-truth Generated samplesFigure 1: Examples from the LIDC dataset, where expert
+radiologists were asked to annotate lung nodules. Despite
+their expertise, they disagree significantly on many cases.
+Standard segmentation networks fail to capture these vari-
+ations, thereby giving a false sense of confidence in model
+predictions. Our approach learns the distribution of possible
+labels, allowing us to generate realistic and diverse segmen-
+tations.
+labeling.
+Instead, multiple possible correct segmentation maps
+may be required to reflect the true distribution of annota-
+tions. For instance, Fig. 1 illustrates the task of lung nod-
+ule segmentation from CT scans where expert annotators
+provide multiple valid segmentation maps. In this con-
+text, stochastic semantic segmentation methods must learn
+to predict conditional distributions of labels given the im-
+age. Doing so is challenging, however, as the distribution is
+typically multimodal, the output space is high-dimensional,
+and annotation data is limited.
+Denoising Diffusion Probabilistic Models (DDPMs) ap-
+pear well-suited to overcome these challenges. DDPMs
+have recently drawn strong interest in computer vision as
+a framework for learning complex distributions in high-
+dimensional spaces. After achieving state-of-the-art per-
+formance on image synthesis [13], they have been success-
+fully extended to solve tasks such as text-to-image gener-
+ation [41], counterfactual explanation generation [24], in-
+painting [34], but also image classification [56] and seman-arXiv:2303.08888v5  [cs.CV]  11 Sep 2023tic segmentation [1, 3, 48] amongst others.
+While DDPMs were originally formulated as probabilis-
+tic models able to learn high-dimensional data distributions
+of discrete and ordered variables ( e.g., RGB pixel values),
+re-formulations and modifications that allow for categori-
+cal variables ( e.g., labels) [21] are one of the key reasons
+why DDPMs are being explored in a broad range of com-
+puter vision tasks [12]. Specifically, the ability to model the
+spatial distribution of categorical variables is well suited for
+numerous computer vision tasks, including semantic seg-
+mentation [6, 8, 10, 14, 16, 17, 27, 31, 33, 54, 55]. Yet
+until now, segmentation methods using DDPMs have relied
+on the original discrete and ordered formulation and differ-
+ent heuristics to yield categorical outputs [1, 3, 48]. Conse-
+quently, the potential advantages of adopting diffusion mod-
+els of categorical variables for stochastic image segmenta-
+tion are still unknown.
+In light of the above, we propose a conditional cate-
+gorical diffusion model (CCDM) for semantic segmenta-
+tion based on DDPMs, which models both the observed
+and the latent variables as categorical distributions. This
+enables the model to explicitly generate labels maps of dis-
+crete, unordered variables, thereby circumventing the need
+for switching between continuous and discrete domains, as
+in previous methods. The model is conditioned to the input
+image, making it possible to generate multiple segmentation
+label maps that account for the aleatoric uncertainty arising
+from image ambiguity. We show experimentally that our
+approach achieves state-of-the-art performance on LIDC, a
+stochastic semantic segmentation dataset, according to sev-
+eral performance measures. Moreover, when applied to the
+classical segmentation dataset Cityscapes, our method pro-
+vides competitive results, outperforming established base-
+lines.
+In summary, our main contributions are the following:
+• We propose a conditional categorical diffusion model
+capable of learning the label distribution given an in-
+put image that can be used to produce diverse segmen-
+tation samples that capture aleatoric uncertainty.
+• For the task of learning a multi-rater semantic segmen-
+tation label distribution, our method achieves state-of-
+the-art performance on LIDC, being the first diffusion-
+based approach proposed for this task.
+• We report competitive performance on a challenging
+semantic segmentation task, Cityscapes, outperform-
+ing several established baselines using a lightweight
+model that also leverages an off-the-shelf pre-trained
+feature extractor.
+2. Related work
+Stochastic segmentation: Methods for stochastic se-mantic segmentation aim at capturing the aleatoric uncer-
+tainty and inherent unpredictability of the labels used for
+segmentation. Different frameworks have been proposed to
+yield segmentations according to the underlying label dis-
+tribution.
+Initial works aimed at equipping a standard U-Net [40]
+with a probabilistic element to generate multiple predic-
+tions for the same image, typically accomplished by adding
+a conditional variational autoencoder (cV AE) [45], where
+the low-dimensional latent space of the cV AE encodes the
+possible segmentation variants. In [28], samples from this
+latent space are upscaled and concatenated at the last layer
+of the U-Net. Multiple methods extend this set-up to a hier-
+archical version [4, 29, 53]. Other works use normalizing
+flows to allow for a more expressive distribution than the
+Gaussian distribution in the cV AE [43, 46], switch to a dis-
+crete latent space [37], or add variational dropout and use
+the inter-grader variability directly as a training target [23].
+Several other methods do not rely on the probabilistic
+U-Net. Monteiro et al. [35] propose a network that uses a
+low-rank multivariate normal distribution to model the logit
+distribution. Kassapis et al. [25] leverage adversarial train-
+ing to learn possible label maps based on the logits of a
+trained segmentation network. Zhang et al. [52] employ an
+autoregressive PixelCNN to model the conditional distribu-
+tion between pixels. Finally, Gao et al. [15] use a mixture
+of stochastic experts, where each expert network estimates
+a mode of the uncertainty, and a gating network predicts the
+probabilities that an input image is segmented by one of the
+experts. Our method is the first to explore the use of cate-
+gorical diffusion models for stochastic segmentation.
+Diffusion models: Generative diffusion models [44]
+have drawn much attention following their popularization
+by [19]. Since then, diffusion models have been success-
+fully applied to various domains, such as image generation,
+restoration, and super-resolution [12].
+More central to the work presented here, a few meth-
+ods have attempted to apply diffusion models to seman-
+tic segmentation. Baranchuk et al. [3] first train diffu-
+sion models to generate images, then use multilayer per-
+ceptrons (MLP) on its features to predict the class label.
+Other works focus on binary segmentation with conditional
+diffusion models [1, 48]. These methods generate single-
+channel continuous samples conditioned on the input image
+and obtain binary segmentation masks by thresholding the
+result. Directly applying continuous diffusion is also done
+in [49, 50]. Chen et al. [9] generate discrete data with con-
+tinuous diffusion models by encoding categorical data into
+bits and modeling these bits as real numbers.
+Hoogeboom et al. [21] propose multinomial diffusion, a
+variation of diffusion models designed for categorical data.
+Subsequently, multinomial diffusion has been applied to
+discrete use cases, such as for tabular data [30], the latentspace of vector-quantized variational auto-encoders [11, 22]
+or text [21]. They can also generate segmentation maps in
+the unconditional setting at a very small resolution ( 32×
+64) [21]. Instead, we focus on the unexplored conditional
+case and demonstrate results at significantly higher resolu-
+tions (up to 256×512).
+3. Method
+We now introduce our approach by first framing the
+problem setting and defining the necessary notation. We
+then describe categorical diffusion models and the condi-
+tioning procedure to produce stochastic semantic segmen-
+tation via diffusion.
+3.1. Background and notation
+A denoising diffusion probabilistic model (DDPM) is a
+latent variable model pθ(x0) =R
+pθ(x0:T)dx1:Tdescrib-
+ing the distribution of an observable variable x0∈RDus-
+ing a collection of Tlatent variables {xt}T
+t=1with the same
+dimensionality as x0. The joint distribution is modeled as
+a Markov chain pθ(x0:T) = p(xT)QT
+t=1pθ(xt−1|xt),
+which is commonly known as the reverse process . The ini-
+tialp(xT)is set to a known, tractable distribution such as
+the Gaussian distribution, while the transition distribution
+pθ, parameterized by θ, is the trainable component of the
+model. Training a DDPM aims to approximate pθ(x0)to an
+empirical distribution q(x0)defined by a collection of sam-
+ples ( e.g., images from the real world). To that end, training
+minimizes the cross-entropy between both distributions,
+min
+θEx0∼q(x0)[−logpθ(x0)], (1)
+which is intractable as it requires marginalizing over the
+latent variables. Instead, a tractable distribution q(x1:T|
+x0)is introduced and used as an approximation to the in-
+tractable true posterior p(x1:T|x0)to define the evidence
+lower bound (ELBO),
+logpθ(x0)≥Ex1:T∼q(x1:T|x0)
+logpθ(x0:T)
+q(x1:T|x0)
+,(2)
+where the expectation is approximated by Monte Carlo
+sampling. The lower bound is tight when the approximate
+posterior qequals the real posterior. Maximizing the ELBO
+over samples from q(x0)minimizes the cross-entropy loss
+of Eq. (1).
+The key difference between DDPMs and other latent
+variable models is that the approximate posterior q(x1:T|
+x0)is fixed and not learnable. DDPMs model this distri-
+bution as a Markov chain q(x1:T|x0) =QT
+t=1q(xt|
+xt−1), known as the forward process . The transition dis-
+tribution q(xt|xt−1)is chosen to be a tractable distri-
+bution that allows efficient sampling from q(xt|x0)foranyt. The only constraint in the design of a DDPM is that
+q(xT|x0)≈p(xT).
+The original DDPM [19] modeled the transition distribu-
+tions of the forward and the reverse processes as Gaussian
+with diagonal covariance matrices, and p(xT)as a standard
+multivariate normal. However, these assumptions are inade-
+quate when the elements of x0belong to discrete, unordered
+sets, as in the task of image segmentation.
+3.2. Categorical diffusion model
+We now consider the denoising diffusion formulation to
+learn complex distributions of discrete image labelings. The
+observable variable x0∈ LDis categorical, where Dis the
+number of pixels of the image and L={1, . . . , L }is the
+set of discrete labels that can be assigned to each pixel. Fol-
+lowing [21], we consider that all latent variables in x1:Tare
+also categorical and that the transition distributions for the
+forward and reverse processes are modeled as categorical
+distributions. For the forward process, the transition dis-
+tribution acts element-wise over the previous state xt−1to
+produce the parameters of the distribution for xtas,
+q(xt|xt−1) =DY
+d=1q(xt[d]|xt−1[d]), (3)
+where xt[d]indicates the label at time tand pixel d. In the
+following discussion, we will use xt∈ L to refer to the
+label of a single pixel d, and we will drop the index dfor
+clarity. The pixel-wise transition distribution q(xt|xt−1)
+gives the element-wise probability of the next label given
+the previous label as,
+q(xt|xt−1) =C
+xt;βt
+L1+ (1−βt)ext−1
+,(4)
+where 1= (1, . . . , 1)T,eℓis the one-hot encoding vector
+with 1 in position ℓand0elsewhere, and the hyperparame-
+terαt= 1−βt∈(0,1)indicates the probability of keep-
+ing the label unchanged. C(x;p)denotes the categorical
+distribution with parameter vector p∈[0,1]L. From the
+properties of categorical distributions, C(x|p) =p[x]andP
+xp[x] = 1 .
+The transition distribution of the forward process can be
+composed as,
+q(xt|x0) =C
+xt;1−¯αt
+L1+ ¯αtex0
+(5)
+with ¯αt=Qt
+τ=1ατ, which enables efficient sampling of
+elements from the Markov chain at any location t. Finally,
+the posterior of the transition distribution can be computed
+with the previous formulas by applying Bayes rule,
+q(xt−1|xt, x0) =C(xt−1;π(xt, x0)), (6)next iterationConditional Categorical Diffusion
+Reverse Process
+𝐼
+𝒙𝑇(1)
+𝒙𝑇(𝑁)𝒙0(𝑁)𝒙0(1)𝐼
+𝒙𝑡(𝑖)𝒙𝑡−1(𝑖)𝑝𝜃(𝒙𝑡−1|𝒙𝑡,𝐼)
+......Figure 2: Illustration of the reverse process of our method.
+The conditional categorical diffusion model (CCDM) re-
+ceives as input an image Iand a categorical label map x(i)
+T
+sampled from the categorical uniform noise. The reverse
+process of the CCDM generates a label map x(i)
+0, which is
+a sample from the learned distribution p(x0|I). When
+repeated for Nsamples, we obtain an empirical approxi-
+mation to the multimodal label distribution for the image I,
+learned from the annotations of multiple expert raters.
+with,
+π(xt, x0) =1
+˜πβt
+L1+αtext
+⊙1−¯αt−1
+L1+ ¯αt−1ex0
+(7)
+and˜π=1−¯αt
+L+ ¯αt·δx0xt, where δis the Kronecker delta.
+The transition distribution of the reverse process is also
+an element-wise categorical distribution,
+pθ(xt−1|xt) =DY
+d=1C(xt−1;ˆpt−1), (8)
+where xt−1=xt−1[d]andˆpt−1are the label and the es-
+timated parameter vector, respectively, at pixel d. Unlike
+the forward process, the parameter vector for the pixel d
+is not computed considering only the element dofxt. In-
+stead, it is modeled as a function f:LD→[0,1]D×L
+that incorporates context by considering the entire label
+mapxtto produce a collection of Dprobability distribu-
+tions for xt−1, which we refer to as ˆPt−1∈[0,1]D×Lwith
+ˆpt−1=ˆPt−1[d].
+While it is possible to use a neural network to estimate
+ˆPt−1, Ho et al. [19] suggested that a consistent output space
+for the network led to enhanced performance. Following
+this idea, we train a network fθ, parameterized by θ, to
+compute ˆP0=fθ(xt, t)∈[0,1]D×Lby receiving a la-
+bel map xtand the step t. We then transform the parameter
+vector for each pixel, ˆp0=ˆP0[d]to the parameter vector
+ˆpt−1for the same pixel of xt−1as,
+C(xt−1;ˆpt−1) = (9)
+=X
+x0q(xt−1|xt, x0)· C(x0;ˆp0) (10)
+=X
+x0C(xt−1;π(xt, x0))· C(x0;ˆp0), (11)from which,
+ˆpt−1=X
+x0∈Lπ(xt, x0)·ˆp0[x0], (12)
+where we have omitted the pixel indices dfor clarity. This
+transformation is not necessary when t= 1, as then ˆpt−1=
+ˆp0computed by fθ. It is also possible to perform this
+computation in parallel for every pixel to efficiently obtain
+ˆPt−1. Note that the result of Eq. (12) differs from the pa-
+rameter vector computed in [21], where the ill-defined ex-
+pression ˆpt−1=π(xt,ˆx0)is employed.
+3.3. Conditional categorical diffusion
+In stochastic segmentation, the label map x0for an im-
+ageIis modeled by a distribution q(x0|I). This distri-
+bution is often too complex to be properly approximated as
+a product of pixel-wise categorical distributions. We use a
+conditional categorical diffusion model p(x0|I)(CCDM)
+to model the potentially complex interactions between la-
+bels and pixels.
+When conditioning the categorical diffusion model on
+an image, the forward process remains unchanged, q(x1:T|
+x0, I) =q(x1:T|x0), as any latent variable is condition-
+ally independent of the image given any previous variable.
+On the other hand, the reverse process needs to incorporate
+the dependency on the image in its transition distribution,
+pθ(x0:T|I) =p(xT|I)QT
+t=1pθ(xt−1|xt, I). In prac-
+tice, this dependency is enforced by an additional input to
+the neural network fθ(xt, t, I).
+3.4. Training
+Training is performed by maximizing the ELBO of
+Eq. (2). Reorganizing terms and distributing expectations
+for variance reduction, we express the ELBO as a sum of
+three terms:
+logpθ(x0|I)≥
+Ex1∼q(x1|x0)[logpθ(x0|x1, I)] (13)
+−TX
+t=2Ext∼q(xt|x0)[KL(q(xt−1|xt,x0)∥pθ(xt−1|xt, I))]
+(14)
+−KL(q(xT|x0)∥p(xT|I)). (15)
+The first two terms can be optimized by standard gra-
+dient ascent. We approximate the expectations with Monte
+Carlo sampling with a single sample. The sum over the time
+variable tis also approximated by a single uniform sample
+over{1, . . . , T }. The KL divergence of the second term is
+the sum of pixel-wise KL divergences,
+KL(q∥p) =DX
+d=1KL(q(xt−1|xt, x0)∥pθ(xt−1|xt, I)),
+(16)Algorithm 1 Training a CCDM with Tsteps
+Require: Training data expressed as the empirical distribu-
+tionq(x0, I) =q(x0|I)q(I).
+repeat
+t∼Uniform ({1, ..., T})
+I∼q(I)
+x0∼q(x0|I)
+xt∼q(xt|x0)
+ˆP0←fθ(xt, I, t) ▷shape D×L
+ift >1then
+▷Pixel-wise application of Eq. (12)
+ˆpt−1←P
+x0∈Lπ(xt, x0)·ˆp0[x0]▷shape L
+▷Compute KL with Eq. (8) and (16)
+ℓ←KL(q(xt−1|xt,x0)∥pθ(xt−1|xt, I))
+else
+ℓ← −P
+dlogC(x0|ˆP0[d])
+end if
+θ←θ− ∇ θℓ ▷Gradient descent
+until converged
+where the parameter vectors of distributions qandpare
+computed with Eqs. (7) and (12), respectively. Alg. 1 shows
+the complete training procedure.
+The third term of Eq. (15) does not depend on the learn-
+able parameters θand is ignored during training. It is op-
+timized by the design of the categorical diffusion model.
+Since the forward process converges as
+lim
+t→∞q(xt|x0) =C
+x;1
+L
+, (17)
+we fix p(xT|I)to the element-wise uniform distribution,
+p(xT|I) =p(xT) =C
+xT;1
+L
+. (18)
+This ensures that p(xT|I)≈q(xT|x0), making the third
+term of the ELBO close to zero.
+At inference, the CCDM samples from p(x0|I)to gen-
+erate label maps for a given image I, which is achieved
+by traversing the Markov chain of the reverse process as
+outlined in Alg. 2 and illustrated in Fig. 2. To minimize
+the noise of the generated label maps, the CCDM selects
+the label with maximum probability instead of sampling
+fromC(x0|ˆp0)in the final step.
+3.5. Architecture of fθ
+As described above, the neural network fθreceives a
+label map xt, a time step t, and an image Ito estimate
+the probability parameters for x0. Its base design is a U-
+Net-like architecture [13] with self-attention modules at the
+three innermost layers of the encoder and the decoder [13].
+The network processes the input label map represented asAlgorithm 2 Inference from a CCDM with Tsteps
+Require: Input image I,fθa network trained with Alg. 1
+xT∼ CD 
+xT;1
+L
+xprev←xT ▷Stores interm. and final prediction
+fort=T, ..., 1do
+ˆP0←fθ(xprev, I, t)
+ift >1then
+▷Pixel-wise application of Eq. (12)
+ˆpt−1←P
+x0∈Lπ(xt, x0)·ˆp0[x0]
+xprev∼Q
+dC(xt−1|ˆpt−1)
+else
+▷Final prediction
+xprev←arg maxx0∈LˆP0[:, x0]
+end if
+end for
+a binary tensor with Lchannels encoding the label of each
+pixel as a one-hot vector. Parameters of the network are
+shared for all values of t. The step variable tis encoded
+with the standard transformer sinusoidal position embed-
+ding [19] and concatenated as additional channels to the in-
+put tensor and to the feature maps of intermediate layers.
+Similarly, information from the input image Iis presented
+to the network as raw pixel values concatenated to the input
+tensor as additional channels. In some experiments we used
+a pre-trained transformer architecture Dino-ViT [5] to ex-
+tract informative visual features from the image I. In those
+cases, the extracted features were concatenated to the fea-
+ture map of the third level of the U-Net encoder, which cor-
+responds to a spatial shape equal to1
+8the shape of the input
+image.
+4. Experiments
+In all our experiments, we set T= 250 and the collection
+ofβtare set following the cosine schedule proposed in [36].
+We evaluate our method on two tasks described below.
+4.1. Segmentation with multiple annotations
+Dataset The Lung Image Database Consortium
+(LIDC) [2] binary segmentation dataset consists of
+1’018 three dimensional chest CT scans of patients with
+lung cancer. Lung nodules of each volume are annotated
+by four expert raters from a pool of 12, yielding large
+differences in annotations in some cases. We extract
+nodule-centered slices from the CT volumes and treat each
+slice as an independent image.
+While LIDC is the standard benchmark of stochastic seg-
+mentation methods to date ( e.g. [4, 15, 23, 25, 28, 29, 35,
+43, 53, 54]), experimental configurations (pre-processing,
+training/validation/test splits, metrics) vastly differ across
+the literature. We conduct our experiments on the two most
+prominent LIDC splits and report results on both separately.LIDCv1 LIDCv2
+Method GED 16 GED 32 GED 50 GED 100 HM-IoU 16 HM-IoU 32 GED 16 GED 50 GED 100 HM-IoU 16
+Prob. Unet [28] 0.310 ±0.01−0.303 ±0.01+ - 0.252 ±0.004†0.552 ±0.00− 0.548 ±0.00+0.320 ±0.030‡ - 0.252 ±‡ 0.500 ±0.030‡
+HProb. Unet [29] 0.270 ±0.01− - - - 0.530 ±0.01− - 0.270 ±0.010‡ - - 0.530 ±0.01
+PhiSeg [4] 0.262 ±0.00−0.247 ±0.00+ - 0.224 ±0.004†0.586 ±0.00− 0.595 ±0.00+ - - - -
+SSN [35] 0.259 ±0.00−0.243 ±0.01+ - 0.225 ±0.002 0.558 ±0.00− 0.555 ±0.01+ - - - -
+cFlow [43] - 0.225 ±0.01+ - - - 0.584 ±0.00+ - - - -
+CAR [25] - - - 0.228 ±0.009 - - 0.264 ±0.002 0.248 ±0.004 0.243 ±0.004 0.592 ±0.005
+JProb. Unet [53] - 0.206 ±0.00 - - - 0.647 ±0.01 0.262 ±0.00 - - 0.585 ±0.00
+PixelSeg [52] 0.243 ±0.01 - - - 0.614 ±0.00 - 0.260 ±0.00 - - 0.587 ±0.01
+MoSE [15] 0.218 ±0.003 - 0.195 ±0.002 0.189 ±0.002 0.624 ±0.004 - - - - -
+AB [9] 0.213 ±0.001 0.196 ±0.002 0.193 ±0.002 - 0.614 ±0.001 0.619 ±0.001 - - - -
+CIMD [38] 0.234 ±0.005 0.218 ±0.005 0.210 ±0.005 - 0.587 ±0.001 0.592 ±0.002 - - - -
+CCDM (ours) 0.212 ±0.002 0.194 ±0.001 0.187 ±0.002 0.183 ±0.002 0.623 ±0.002 0.631 ±0.002 0.239 ±0.003 0.216 ±0.003 0.210 ±0.003 0.598 ±0.001
+Table 1: Quantitative results on LIDCv1 and LIDCv2, with the methods ordered by year. Bold and underlined indicate best
+and second best per column, respectively. Our results are over 3 seeds. For GED, lower is better; for HM-IoU, higher is
+better. No method, including ours, uses pre-trained weights. Results for CIMD [38] and AB [9] are ours. All other scores are
+taken from their original papers, except (+) from [53], (−) from [53], (†) from [35], ‡from [25].
+The first, referred to as LIDCv1, is used in [4, 15, 35, 53].
+LIDCv1 comprises 15’096 slices, divided into training, val-
+idation, and testing sets with the ratio 60 : 20 : 20 . The
+second, LIDCv2, is used in [25, 28] and contains 12’816
+images with the ratio 70 : 15 : 15 .
+Metrics We measure the performances with the Gener-
+alised Energy Distance (GED) and the Hungarian-Matched
+Intersection over Union (HM-IoU) [15, 25, 29]. Both met-
+rics measure the difference between the distributions of gen-
+erated and ground-truth label maps. We denote the metrics
+computed with nsamples using a subscript, i.e., GED nand
+HM-IoU n, and we set nto common values found in the
+literature. Note that higher number of samples yield more
+precise estimates.
+Baselines We compare our approach to eleven re-
+cent stochastic segmentation methods: probabilistic U-
+Net (Prob. Unet) [28], hierarchical probabilistic U-Net
+(HProb. Unet) [29], PhiSeg [4], stochastic segmenta-
+tion network (SSN) [35], conditional normalizing flow
+(cFlow) [43], calibrated adversarial refinement (CAR) [25],
+joint probabilistic U-Net (JProb. Unet) [53], PixelSeg [52],
+mixture of stochastic experts (MoSE) [15], analog bits
+(AB) [9], and collectively intelligent medical diffusion
+(CIMD) [38].
+Following standard practice, we use random horizontal
+and vertical flipping and random rotations of 0◦,90◦,180◦
+and270◦for data augmentation. The resolution of the input
+images is 128×128. We trained our method with the Adam
+optimizer [26] until convergence of the GED metric on the
+validation set, a polynomial learning rate scheduling start-
+ing from 1e−4and ending with 1e−6, and batch size of 64.
+We applied Polyak averaging with α= 0.99995 .4.2. Segmentation with a single annotation
+We also evaluate our method with Cityscapes, a classical
+multi-class segmentation dataset where each image is an-
+notated with a single label map. It comprises 2’975 RGB
+images of urban scenes for training and 500 images for val-
+idation, with each image labeled using 19 possible classes.
+We compare our approach to several established base-
+lines using the validation set: DeepLabv3 [7], HRNet [47],
+and UPerNet [51], with both ResNet [18] and Swin [32]
+backbones.
+Besides our standard method, which performs image
+conditioning by concatenating the raw pixel values as chan-
+nels of the input tensor, we also included in our comparison
+a variant CCDM-Dino which leverages pre-trained Dino-
+ViT features [5] as additional conditioning concatenated to
+intermediate feature maps of our model’s encoder.
+Experiments are conducted separately for two different
+image resolutions: 128×256and256×512. For all re-
+ported methods, we first resize the images to a fixed reso-
+lution and then apply color jittering, random flipping, and
+standard ImageNet intensity normalization as data augmen-
+tation. All baselines are trained for 500epochs with a batch
+size of 32, with optimizers, learning rate schedules, and
+weight decay settings as reported in their respective pub-
+lications (reported in detail in the supplementary material).
+Our method was trained for 800epochs with a batch size
+of32at128×256and of 16at256×512, using the Adam
+optimizer [26] with a learning rate of 1e−4linearly decayed
+to1e−6. We applied Polyak averaging with α= 0.999.
+Performance is measured with the mean intersection-
+over-union (mIoU). Unlike GED and HM-IoU, the metric
+mIoU is incompatible with multiple label maps per image.
+During inference, CCDM generates multiple label maps per
+image that are subsequently fused into a single label map forperformance assessment. We found that fusing by averag-
+ing the predicted probabilities resulted in superior perfor-
+mances compared to fusing by majority vote.
+5. Results
+5.1. LIDC
+We report performances on LIDCv1 and LIDCv2 in
+Tab. 1 and qualitative results in Fig. 3. Due to the lack of
+consistent evaluation protocols, we use a total of 10 metrics,
+thereby covering all the baselines and allowing for direct
+comparisons.
+Our CCDM reaches the best performance for eight out of
+the ten metrics, despite its relatively small size, with 9M pa-
+rameters compared to, e.g., the 42M parameters of MoSE.
+CCDM also outperforms recent continuous diffusion mod-
+els for segmentation, including AB [9] (9M parameters) and
+CIMD [38] (24M parameters). On HM-IoU 16, the CCDM
+has a lower mean performance than MoSE by 0.001, but
+with only half the standard deviation. The JProb. Unet
+reaches a higher HM-IoU 32than all other methods, despite
+being considerably worse for GED 32than our CCDM. Fur-
+thermore, on LIDCv2, the JProb. Unet achieves only the
+third-best score on GED 16, and fourth-best on HM-IoU 16.
+This result indicates how comparing results obtained on dif-
+ferent LIDC versions with each other can be misleading.
+Fig. 3 presents qualitative results from our method. In
+columns (g)-(l), we see that our CCDM generates a distri-
+bution of samples that captures the annotation variability
+created by the four expert raters. Further, as seen in the
+bottom example, the CCDM also generates empty samples
+according to the annotations (b)-(e).
+Reduced number of time steps for sampling: During
+inference, traversing the Tsteps of the reverse process
+makes sampling from DDPMs slow. A straightforward so-
+lution [36] involves traversing only a subset of nodes of the
+reverse process, {xkτ:τ∈ {0, . . . , T/k }}, reducing the
+number of steps by a factor k. This technique accelerates
+inference at the expense of reduced performance. To illus-
+trate the trade-offs between performance and speed, Fig. 5
+presents the evolution of GED 16and HM-IoU 16as the num-
+ber of inference steps is reduced. As expected, CCDMs per-
+form best when the number of training and inference steps
+are equal, but a reasonable increase in speed without a large
+sacrifice in performance is possible.
+5.2. Cityscapes
+Experimental comparisons on Cityscapes are presented
+in Tab. 2, and qualitative examples are provided in Fig. 4.
+Experiments at 128×256demonstrate that CCDM-Dino
+outperforms all other methods, even when only a single
+sample is used. CCDM-raw also remains competitive, be-
+ing outperformed only by one baseline (UPerNet+Swin-Method mIoU final (best)
+Architecture Backbone #params 128×256 256 ×512
+DeepLabv 3[7] ResNet50 ( ✓) 39m 43.4 (44.1) 58.6 (59.2)
+DeepLabv 3[7] ResNet101 ( ✓) 58m 43.8 (45.5) 59.2 (59.8)
+UPerNet [51] ResNet101 ( ✓) 83m 45.5 (47.1) 60.7 (61.2)
+HRNet [47] w48v2 ( ✓) 70m 48.2 (49.5) 63.3 (64.2)
+UPerNet [32] Swin-Tiny ( ✓) 58m 54.2 (55.9) 65.5 (66.0)
+CCDM (ours) -
+samples=1 30m 53.2 60.3
+samples=5 30m 55.4 62.0
+samples=10 30m 56.2 62.4
+CCDM (ours) Dino ViT-S ( †)
+samples=1 30m + 20M 55.5 64.0
+samples=5 30m + 20M 56.9 65.4
+samples=10 30m + 20M 57.3 65.8
+Table 2: Results on Cityscapes-val for resolutions 128×256
+and256×512.Bold and underlined indicate best and sec-
+ond best per column, respectively. ( ✓) and ( †) indicate su-
+pervised and self-supervised pretraining of the backbone,
+respectively. Gray indicates pretrained, non-finetuned pa-
+rameters. We report final performance for our method and
+baselines. For the latter we also provide best achieved
+performance during training (in parenthesis). For CCDM
+methods, the field samples indicates the number of gener-
+ated samples for label map fusion, as explained in Sect 4.2.
+CCDM Capacity mIoU ( 128×256)
+#params UNet Levels samples=1 samples=5 samples=10
+5.4M 4 37.8 39.7 40.6
+7.5M 5 44.7 48.3 48.5
+22M 4 51.6 54.0 53.6
+30M 5 53.2 55.4 56.2
+Table 3: Effect of increasing CCDM capacity (without fea-
+ture conditioning).
+Tiny), despite using only between 36% and51% of the pa-
+rameters of other models. Similarly, at 256×512, CCDM-
+Dino outperforms four of the baselines with a single sample,
+lags behind UPerNet+Swin-Tiny only by 0.1percent points
+with5samples, and outperforms all baselines with 10sam-
+ples. As expected, averaging across more samples improves
+performance for both CCDM-raw and CCDM-Dino, albeit
+with diminishing gains. Furthermore, the addition of Dino
+features boosts single-sample performance by 2.3percent
+points at 128×256, and 3.7percent points at 256×512,
+hinting the greater value of adding feature conditioning for
+generating segmentation at a higher resolution.
+CCDM Capacity : Tab. 3(b) demonstrates the effect of in-
+creasing the capacity of CCDM. Using more U-Net feature
+levels, and increasing the number of parameters by doubling
+the number of channels per level, increases the performance
+regardless of the number of samples used for inference.a) b) h) c) g) e) d) f) i) j) k) l)Figure 3: Qualitative results on four LIDC images with our method. (a) shows the image, (b)-(e) its four labels, (f) the mean
+prediction of our CCDM over six predictions, and (g)-(l) six individual predictions.
+Figure 4: Qualitative comparisons on Cityscapes. All methods are trained and tested at a resolution of 256×512. Our method
+produces structures with greater visual realism than other baselines. This is especially noticeable inside the marked regions.
+0 50 100 150 200 250
+Sampling Steps0.200.250.300.350.400.450.500.55GED16GED
+HM-IoU
+0.390.430.460.500.540.580.610.65
+HM-IoU16
+Figure 5: LIDC GED and HM-IoU versus the number of
+sampling steps on LIDC. Evaluated on 500 random test im-
+ages using 16 samples each, over 3 seeds.6. Conclusion
+We introduced conditional categorical diffusion models
+(CCDMs) that are capable of effectively modeling pixel-
+level semantic distributions. Notably, and contrary to stan-
+dard deterministic segmentation approaches, our model can
+produce diverse samples given an input image, thereby cap-
+turing the aleatoric uncertainty. Our method learns a multi-
+modal label distribution of segmentations, induced by an-
+notations from multiple expert raters, for which it achieves
+state-of-the-art results on a challenging medical imaging
+dataset, LIDC. Additionally, we demonstrate that it can
+achieve competitive performance on a standard multi-class
+semantic segmentation benchmark, Cityscapes, by outper-
+forming several established, heavily engineered baselinesdespite using significantly fewer parameters.
+One limitation of our method is the requirement of sev-
+eral iterations for producing a sample, which is a com-
+mon shortcoming of diffusion models. Accelerating sam-
+pling constitutes a crucial research direction, orthogonal
+to the present work. Finally, resolution scaling remains
+notoriously difficult for diffusion models, with successful
+examples relying on massive computational resources to
+train cascades of models that gradually increase resolu-
+tion [20, 42] or operate on the latent space of existing em-
+bedding methods for continuous data ( e.g. images) [39] that
+are not available for categorical data.
+Acknowledgements
+This work was partially funded by the University of
+Bern, Swiss National Science Foundation Grants #320030-
+188591, #200021-192285, and #200021-191983.
+References
+[1] Tomer Amit, Eliya Nachmani, Tal Shaharbany, and Lior
+Wolf. Segdiff: Image segmentation with diffusion proba-
+bilistic models. arXiv preprint arXiv:2112.00390 , 2021. 2
+[2] Samuel G Armato III, Geoffrey McLennan, Luc Bidaut,
+Michael F McNitt-Gray, Charles R Meyer, Anthony P
+Reeves, Binsheng Zhao, Denise R Aberle, Claudia I Hen-
+schke, Eric A Hoffman, et al. The lung image database con-
+sortium (lidc) and image database resource initiative (idri):
+a completed reference database of lung nodules on ct scans.
+Medical physics , 38(2):915–931, 2011. 5
+[3] Dmitry Baranchuk, Ivan Rubachev, Andrey V oynov,
+Valentin Khrulkov, and Artem Babenko. Label-efficient se-
+mantic segmentation with diffusion models. arXiv preprint
+arXiv:2112.03126 , 2021. 2
+[4] Christian F Baumgartner, Kerem C Tezcan, Krishna Chai-
+tanya, Andreas M H ¨otker, Urs J Muehlematter, Khoschy
+Schawkat, Anton S Becker, Olivio Donati, and Ender
+Konukoglu. Phiseg: Capturing uncertainty in medical im-
+age segmentation. In Medical Image Computing and Com-
+puter Assisted Intervention–MICCAI 2019: 22nd Interna-
+tional Conference, Shenzhen, China, October 13–17, 2019,
+Proceedings, Part II 22 , pages 119–127. Springer, 2019. 2,
+5, 6
+[5] Mathilde Caron, Hugo Touvron, Ishan Misra, Herv ´e J´egou,
+Julien Mairal, Piotr Bojanowski, and Armand Joulin. Emerg-
+ing properties in self-supervised vision transformers. In Pro-
+ceedings of the International Conference on Computer Vi-
+sion (ICCV) , 2021. 5, 6
+[6] Liang-Chieh Chen, George Papandreou, Iasonas Kokkinos,
+Kevin Murphy, and Alan L Yuille. Deeplab: Semantic image
+segmentation with deep convolutional nets, atrous convolu-
+tion, and fully connected crfs. IEEE transactions on pattern
+analysis and machine intelligence , 40(4):834–848, 2017. 2
+[7] Liang-Chieh Chen, George Papandreou, Florian Schroff, and
+Hartwig Adam. Rethinking atrous convolution for seman-tic image segmentation. arXiv preprint arXiv:1706.05587 ,
+2017. 6, 7, 12
+[8] Liang-Chieh Chen, Yukun Zhu, George Papandreou, Florian
+Schroff, and Hartwig Adam. Encoder-decoder with atrous
+separable convolution for semantic image segmentation. In
+Proceedings of the European conference on computer vision
+(ECCV) , pages 801–818, 2018. 2
+[9] Ting Chen, Ruixiang Zhang, and Geoffrey Hinton. Analog
+bits: Generating discrete data using diffusion models with
+self-conditioning. arXiv preprint arXiv:2208.04202 , 2022.
+2, 6, 7
+[10] Xiangxiang Chu, Zhi Tian, Yuqing Wang, Bo Zhang, Haib-
+ing Ren, Xiaolin Wei, Huaxia Xia, and Chunhua Shen.
+Twins: Revisiting the design of spatial attention in vision
+transformers. Advances in Neural Information Processing
+Systems , 34:9355–9366, 2021. 2
+[11] Max Cohen, Guillaume Quispe, Sylvain Le Corff, Charles
+Ollion, and Eric Moulines. Diffusion bridges vec-
+tor quantized variational autoencoders. arXiv preprint
+arXiv:2202.04895 , 2022. 3
+[12] Florinel-Alin Croitoru, Vlad Hondru, Radu Tudor Ionescu,
+and Mubarak Shah. Diffusion models in vision: A survey.
+arXiv preprint arXiv:2209.04747 , 2022. 2
+[13] Prafulla Dhariwal and Alex Nichol. Diffusion models beat
+gans on image synthesis. CoRR , abs/2105.05233, 2021. 1,
+5, 12
+[14] Jun Fu, Jing Liu, Haijie Tian, Yong Li, Yongjun Bao, Zhiwei
+Fang, and Hanqing Lu. Dual attention network for scene seg-
+mentation. In Proceedings of the IEEE/CVF conference on
+computer vision and pattern recognition , pages 3146–3154,
+2019. 2
+[15] Zhitong Gao, Yucong Chen, Chuyu Zhang, and Xuming
+He. Modeling multimodal aleatoric uncertainty in segmen-
+tation with mixture of stochastic expert. arXiv preprint
+arXiv:2212.07328 , 2022. 2, 5, 6, 12
+[16] Jiaqi Gu, Hyoukjun Kwon, Dilin Wang, Wei Ye, Meng Li,
+Yu-Hsin Chen, Liangzhen Lai, Vikas Chandra, and David Z
+Pan. Multi-scale high-resolution vision transformer for se-
+mantic segmentation. In Proceedings of the IEEE/CVF Con-
+ference on Computer Vision and Pattern Recognition , pages
+12094–12103, 2022. 2
+[17] Adam W Harley, Konstantinos G Derpanis, and Iasonas
+Kokkinos. Segmentation-aware convolutional networks us-
+ing local attention masks. In Proceedings of the IEEE Inter-
+national Conference on Computer Vision , pages 5038–5047,
+2017. 2
+[18] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+Deep residual learning for image recognition. In Proceed-
+ings of the IEEE Conference on Computer Vision and Pattern
+Recognition (CVPR) , June 2016. 6
+[19] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising diffu-
+sion probabilistic models. Advances in Neural Information
+Processing Systems , 33:6840–6851, 2020. 2, 3, 4, 5
+[20] Jonathan Ho, Chitwan Saharia, William Chan, David J. Fleet,
+Mohammad Norouzi, and Tim Salimans. Cascaded diffu-
+sion models for high fidelity image generation. Journal of
+Machine Learning Research , 23(47):1–33, 2022. 9[21] Emiel Hoogeboom, Didrik Nielsen, Priyank Jaini, Patrick
+Forr´e, and Max Welling. Argmax flows and multinomial dif-
+fusion: Learning categorical distributions. Advances in Neu-
+ral Information Processing Systems , 34:12454–12465, 2021.
+2, 3, 4
+[22] Minghui Hu, Yujie Wang, Tat-Jen Cham, Jianfei Yang, and
+Ponnuthurai N Suganthan. Global context with discrete dif-
+fusion in vector quantised modelling for image generation.
+InProceedings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition , pages 11502–11511, 2022.
+3
+[23] Shi Hu, Daniel Worrall, Stefan Knegt, Bas Veeling, Henkjan
+Huisman, and Max Welling. Supervised uncertainty quantifi-
+cation for segmentation with multiple annotations. In Med-
+ical Image Computing and Computer Assisted Intervention–
+MICCAI 2019: 22nd International Conference, Shenzhen,
+China, October 13–17, 2019, Proceedings, Part II 22 , pages
+137–145. Springer, 2019. 2, 5
+[24] Guillaume Jeanneret, Lo ¨ıc Simon, and Fr ´ed´eric Jurie. Diffu-
+sion models for counterfactual explanations. arXiv preprint
+arXiv:2203.15636 , 2022. 1
+[25] Elias Kassapis, Georgi Dikov, Deepak K Gupta, and Cedric
+Nugteren. Calibrated adversarial refinement for stochastic
+semantic segmentation. In Proceedings of the IEEE/CVF
+International Conference on Computer Vision , pages 7057–
+7067, 2021. 2, 5, 6
+[26] Diederik P Kingma and Jimmy Ba. Adam: A method for
+stochastic optimization. International Conference for Learn-
+ing Representations , 2015. 6
+[27] Alexander Kirillov, Ross Girshick, Kaiming He, and Piotr
+Doll´ar. Panoptic feature pyramid networks. In Proceedings
+of the IEEE/CVF conference on computer vision and pattern
+recognition , pages 6399–6408, 2019. 2
+[28] Simon Kohl, Bernardino Romera-Paredes, Clemens Meyer,
+Jeffrey De Fauw, Joseph R Ledsam, Klaus Maier-Hein, SM
+Eslami, Danilo Jimenez Rezende, and Olaf Ronneberger.
+A probabilistic u-net for segmentation of ambiguous im-
+ages. Advances in neural information processing systems ,
+31, 2018. 2, 5, 6
+[29] Simon AA Kohl, Bernardino Romera-Paredes, Klaus H
+Maier-Hein, Danilo Jimenez Rezende, SM Eslami, Pushmeet
+Kohli, Andrew Zisserman, and Olaf Ronneberger. A hierar-
+chical probabilistic u-net for modeling multi-scale ambigui-
+ties. arXiv preprint arXiv:1905.13077 , 2019. 2, 5, 6
+[30] Akim Kotelnikov, Dmitry Baranchuk, Ivan Rubachev, and
+Artem Babenko. Tabddpm: Modelling tabular data with dif-
+fusion models. arXiv preprint arXiv:2209.15421 , 2022. 2
+[31] Liulei Li, Tianfei Zhou, Wenguan Wang, Jianwu Li, and Yi
+Yang. Deep hierarchical semantic segmentation. In Proceed-
+ings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition , pages 1246–1257, 2022. 2
+[32] Ze Liu, Yutong Lin, Yue Cao, Han Hu, Yixuan Wei, Zheng
+Zhang, Stephen Lin, and Baining Guo. Swin transformer:
+Hierarchical vision transformer using shifted windows. In
+Proceedings of the IEEE/CVF International Conference on
+Computer Vision (ICCV) , 2021. 6, 7, 12
+[33] Jonathan Long, Evan Shelhamer, and Trevor Darrell. Fully
+convolutional networks for semantic segmentation. In Pro-ceedings of the IEEE conference on computer vision and pat-
+tern recognition , pages 3431–3440, 2015. 2
+[34] Andreas Lugmayr, Martin Danelljan, Andres Romero, Fisher
+Yu, Radu Timofte, and Luc Van Gool. Repaint: Inpainting
+using denoising diffusion probabilistic models. In Proceed-
+ings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition , pages 11461–11471, 2022. 1
+[35] Miguel Monteiro, Lo ¨ıc Le Folgoc, Daniel Coelho de Castro,
+Nick Pawlowski, Bernardo Marques, Konstantinos Kamnit-
+sas, Mark van der Wilk, and Ben Glocker. Stochastic seg-
+mentation networks: Modelling spatially correlated aleatoric
+uncertainty. Advances in Neural Information Processing Sys-
+tems, 33:12756–12767, 2020. 2, 5, 6
+[36] Alexander Quinn Nichol and Prafulla Dhariwal. Improved
+denoising diffusion probabilistic models. In International
+Conference on Machine Learning , pages 8162–8171. PMLR,
+2021. 5, 7
+[37] Di Qiu and Lok Ming Lui. Modal uncertainty estima-
+tion via discrete latent representation. arXiv preprint
+arXiv:2007.12858 , 2020. 2
+[38] Aimon Rahman, Jeya Maria Jose Valanarasu, Ilker Haci-
+haliloglu, and Vishal M Patel. Ambiguous medical image
+segmentation using diffusion models. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition , pages 11536–11546, 2023. 6, 7
+[39] Robin Rombach, Andreas Blattmann, Dominik Lorenz,
+Patrick Esser, and Bj ¨orn Ommer. High-resolution image
+synthesis with latent diffusion models. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR) , pages 10684–10695, June 2022. 9
+[40] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-
+net: Convolutional networks for biomedical image segmen-
+tation. In International Conference on Medical image com-
+puting and computer-assisted intervention , pages 234–241.
+Springer, 2015. 2
+[41] Chitwan Saharia, William Chan, Saurabh Saxena, Lala
+Li, Jay Whang, Emily Denton, Seyed Kamyar Seyed
+Ghasemipour, Burcu Karagol Ayan, S Sara Mahdavi,
+Rapha Gontijo Lopes, et al. Photorealistic text-to-image
+diffusion models with deep language understanding. arXiv
+preprint arXiv:2205.11487 , 2022. 1
+[42] Chitwan Saharia, William Chan, Saurabh Saxena, Lala
+Li, Jay Whang, Emily Denton, Seyed Kamyar Seyed
+Ghasemipour, Raphael Gontijo-Lopes, Burcu Karagol Ayan,
+Tim Salimans, Jonathan Ho, David J. Fleet, and Mohammad
+Norouzi. Photorealistic text-to-image diffusion models with
+deep language understanding. In Alice H. Oh, Alekh Agar-
+wal, Danielle Belgrave, and Kyunghyun Cho, editors, Ad-
+vances in Neural Information Processing Systems , 2022. 9
+[43] Raghavendra Selvan, Frederik Faye, Jon Middleton, and Ak-
+shay Pai. Uncertainty quantification in medical image seg-
+mentation with normalizing flows. In Machine Learning
+in Medical Imaging: 11th International Workshop, MLMI
+2020, Held in Conjunction with MICCAI 2020, Lima, Peru,
+October 4, 2020, Proceedings 11 , pages 80–90. Springer,
+2020. 2, 5, 6
+[44] Jascha Sohl-Dickstein, Eric Weiss, Niru Maheswaranathan,
+and Surya Ganguli. Deep unsupervised learning usingnonequilibrium thermodynamics. In International Confer-
+ence on Machine Learning , pages 2256–2265. PMLR, 2015.
+2
+[45] Kihyuk Sohn, Honglak Lee, and Xinchen Yan. Learning
+structured output representation using deep conditional gen-
+erative models. Advances in neural information processing
+systems , 28, 2015. 2
+[46] MM Amaan Valiuddin, Christiaan GA Viviers, Ruud JG
+van Sloun, Peter HN de With, and Fons van der Som-
+men. Improving aleatoric uncertainty quantification in
+multi-annotated medical image segmentation with normal-
+izing flows. In Uncertainty for Safe Utilization of Ma-
+chine Learning in Medical Imaging, and Perinatal Imaging,
+Placental and Preterm Image Analysis: 3rd International
+Workshop, UNSURE 2021, and 6th International Workshop,
+PIPPI 2021, Held in Conjunction with MICCAI 2021, Stras-
+bourg, France, October 1, 2021, Proceedings 3 , pages 75–
+88. Springer, 2021. 2
+[47] Jingdong Wang, Ke Sun, Tianheng Cheng, Borui Jiang,
+Chaorui Deng, Yang Zhao, Dong Liu, Yadong Mu, Mingkui
+Tan, Xinggang Wang, Wenyu Liu, and Bin Xiao. Deep
+high-resolution representation learning for visual recogni-
+tion. TPAMI , 2019. 6, 7, 12
+[48] Julia Wolleb, Robin Sandk ¨uhler, Florentin Bieder, Philippe
+Valmaggia, and Philippe C Cattin. Diffusion models for
+implicit image segmentation ensembles. arXiv preprint
+arXiv:2112.03145 , 2021. 2
+[49] Junde Wu, Huihui Fang, Yu Zhang, Yehui Yang, and Yanwu
+Xu. Medsegdiff: Medical image segmentation with diffusion
+probabilistic model. arXiv preprint arXiv:2211.00611 , 2022.
+2
+[50] Junde Wu, Rao Fu, Huihui Fang, Yu Zhang, and Yanwu
+Xu. Medsegdiff-v2: Diffusion based medical image segmen-
+tation with transformer. arXiv preprint arXiv:2301.11798 ,
+2023. 2
+[51] Tete Xiao, Yingcheng Liu, Bolei Zhou, Yuning Jiang, and
+Jian Sun. Unified perceptual parsing for scene understand-
+ing. In Proceedings of the European Conference on Com-
+puter Vision (ECCV) , pages 418–434, 2018. 6, 7, 12
+[52] Wei Zhang, Xiaohong Zhang, Sheng Huang, Yuting Lu, and
+Kun Wang. Pixelseg: Pixel-by-pixel stochastic semantic seg-
+mentation for ambiguous medical images. In Proceedings
+of the 30th ACM International Conference on Multimedia ,
+pages 4742–4750, 2022. 2, 6
+[53] Wei Zhang, Xiaohong Zhang, Sheng Huang, Yuting Lu, and
+Kun Wang. A probabilistic model for controlling diversity
+and accuracy of ambiguous medical image segmentation. In
+Proceedings of the 30th ACM International Conference on
+Multimedia , pages 4751–4759, 2022. 2, 5, 6
+[54] Yifan Zhang, Bo Pang, and Cewu Lu. Semantic segmenta-
+tion by early region proxy. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition ,
+pages 1258–1268, 2022. 2, 5
+[55] Hengshuang Zhao, Jianping Shi, Xiaojuan Qi, Xiaogang
+Wang, and Jiaya Jia. Pyramid scene parsing network. In
+Proceedings of the IEEE conference on computer vision and
+pattern recognition , pages 2881–2890, 2017. 2[56] Roland S Zimmermann, Lukas Schott, Yang Song, Ben-
+jamin A Dunn, and David A Klindt. Score-based generative
+classifiers. arXiv preprint arXiv:2110.00473 , 2021. 17. Supplementary material
+7.1. Metrics details
+The GED and HM-IoU metrics used in our work are
+computed as follows:
+GED: Letpmbe the distribution over samples generated
+by a model and pgtthe distribution over possible ground-
+truth labels; the GED is computed as
+GED(pm, pgt) =2Es∼pm,ˆs∼pgt[d(s,ˆs)]−Es,ˆs∼pgt[d(s,ˆs)]
+−Es,ˆs∼pm[d(s,ˆs)], (19)
+where the distance function d(·,·) = 1−IoU(·,·).
+HM-IoU: Finds the optimal matching between ground
+truth and generated samples. Specifically, for ngener-
+ated samples, the ground-truth samples are duplicated to n.
+Then, the HM-IoU is defined as the maximum IoU possible,
+given that every generated sample is matched with a unique
+ground-truth label, found by minimizing
+HM-IoU = min
+XX
+iX
+jd(i, j)Xi,j, (20)
+where Xis a boolean matrix that assigns every row to a
+unique column using d(·,·) = 1−IoU(·,·).
+7.2. Sample diversity
+Sample diversity is the expected distance between gen-
+erated samples, i.e.,Es,ˆs∼pm[d(s,ˆs)], which corresponds to
+the last term of GED in Eq. (19). We report the sample di-
+versity for 16, 32, 50, and 100 samples for both LIDC splits
+in Tab. 4 and Tab. 5.
+LIDCv1
+Method Div16 Div32 Div50 Div100
+CCDM 0.491 ±0.001 0.509 ±0.001 0.515 ±0.002 0.519 ±0.002
+Table 4: Sample diversity for our method on LIDCv1.
+LIDCv2
+Method Div16 Div32 Div50 Div100
+CCDM 0.487 ±0.003 0.503 ±0.003 0.509 ±0.003 0.515 ±0.002
+Table 5: Sample diversity for our method on LIDCv2.
+7.3. Model size
+While our 9M CCDM as reported in Tab. 1 is of compa-
+rable size to most other baselines, we show in Tab. 6 that by
+increasing the size of our CCDM from 9M to 41M, we getan increase in performance across all six metrics computed
+on LIDCv1. Additionally, the CCDM seems to benefit more
+from the increase in size than MoSE [15]. While we already
+outperform the other baselines with our 9M model, this re-
+sult suggests that we can improve the performance even fur-
+ther by using larger models.
+LIDCv1
+Method #params GED 16 GED 32 GED 50 GED 100 HM-IoU 16 HM-IoU 32
+MoSE [15] 9m 0.219 - 0.195 0.190 0.620 -
+MoSE [15] 42m 0.218 - 0.195 0.189 0.624 -
+CCDM 9m 0.212 0.194 0.187 0.183 0.623 0.631
+CCDM 41m 0.207 0.189 0.182 0.177 0.629 0.636
+Table 6: Performance of CCDM and MoSE on LIDCv1
+with different model sizes.
+7.4. Training settings of baselines on Cityscapes
+On Cityscapes, all baselines were trained for 500epochs
+using the optimizer, learning rate schedule, and weight de-
+cay (denoted by wd) reported in their original publications.
+Tab. 7 details these settings for each case. All models are
+trained using a cross-entropy loss.
+Method Settings
+Arch. Backbone Lr Decay wd Batch Size Optim
+HRNet [47] w 48v2 10−2polynomial 5×10−532 sgd
+DeepLabv 3[7] ResNet 50/101 10−2polynomial 5×10−532 sgd
+UPerNet [51] ResNet 101 10−2polynomial 5×10−532 sgd
+UPerNet [32] Swin-T 10−4warmup+linear 10−232 AdamW
+Table 7: Training settings of baselines on Cityscapes.
+7.5. Additional comparisons on Cityscapes
+Method mIoU
+Architecture Backbone #params 128×256 256 ×512
+UNet (CE) [13] - 30m 48.7 61.0
+CCDM (ours) -
+samples=1 30m 53.2 60.3
+samples=5 30m 55.4 62.0
+samples=10 30m 56.2 62.4
+UNet (CE) [13] Dino ViT-S ( †) 30m + 20M 53.4 63.2
+CCDM (ours) Dino ViT-S ( †)
+samples=1 30m + 20M 55.5 64.0
+samples=5 30m + 20M 56.9 65.4
+samples=10 30m + 20M 57.3 65.8
+Table 8: Comparison of our method to UNet and UNet-
+Dino, trained with standard Cross-Entropy (CE) loss, on
+Cityscapes-val. Bold and underlined indicate best and
+second best per column, respectively. ( †) indicates self-
+supervised pretraining of the backbone. Gray indicates pre-
+trained, non-finetuned parameters.Figure 6: Qualitative comparisons of our method to competitive baselines on Cityscapes validation set.
+Figure 7: Visualization of the forward diffusion process at different time steps.
+We evaluate the gains of CCDMs with respect to their
+backbone architectures when used as standalone segmenta-
+tion models. To this end, we compare the performance of
+our CCDM trained as defined in Alg. 1 and the UNet trained
+with a standard cross-entropy loss, both on the Cityscapes
+dataset. Similarly, we compare CCDM-Dino to its stan-
+dalone backbone architecture DinoViT-S. In all cases, we
+adopt the same training settings as our method, namely,
+800epochs, linearly decayed learning rate, batch size of 32
+at128×256and16at256×512. As shown in Tab. 8,
+CCDM and CCDM-Dino outperform their respective stan-
+dalone architectures.
+We also provide additional qualitative comparisons of
+our method to competitive baselines in Fig. 6. Finally,
+Fig. 7 shows an example of the evolution of a Cityscapes
+label map under the forward diffusion process described by
+Eq. (4)."
