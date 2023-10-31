@@ -62,3 +62,13 @@ df = pd.DataFrame(papers)
 df.to_csv('papers_with_abstracts_and_content.csv', index=False)
 
 print(f"Scraped {len(papers)} papers with abstracts and content and saved to 'papers_with_abstracts_and_content.csv'")
+
+
+#all in one script
+#scraping and fetching are intertwined -> changing how we fetch from arxiv would also mean changing how we scrape iccv
+#not that flexible -> to adapt to another conference or fetch from a different source like google scholar we'd need to change the whole thing
+
+#new version with OOP
+#divided in classes, each focused on a task -> fetching, scraping
+#the scraper is independent of the fetcher
+#can easely add new fetchers or scrapers without messing up existing code
