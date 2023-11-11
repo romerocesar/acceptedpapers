@@ -1,11 +1,10 @@
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-import PyPDF2
-from io import BytesIO
+# import PyPDF2  # Not needed if only fetching abstracts
+# from io import BytesIO  # Not needed if only fetching abstracts
 
-#separate 
-def get_abstract_and_content_from_arxiv(arxiv_id):
+def get_abstract_from_arxiv(arxiv_id):
     # Base URL for the arXiv API
     api_url = f"http://export.arxiv.org/api/query?id_list={arxiv_id}"
     
@@ -17,20 +16,7 @@ def get_abstract_and_content_from_arxiv(arxiv_id):
     entry = soup.find('entry')
     abstract = entry.find('summary').text.strip()
     
-    # Get the PDF link and download the PDF
-    pdf_url = entry.find('link', {'title': 'pdf'})['href']
-    pdf_response = requests.get(pdf_url)
-    pdf_response.raise_for_status()
-    
-    # Extract text from the PDF using the new PdfReader class and extract_text method
-    with BytesIO(pdf_response.content) as open_pdf_file:
-        reader = PyPDF2.PdfReader(open_pdf_file)
-        content = ""
-        for page_num in range(len(reader.pages)):
-            content += reader.pages[page_num].extract_text()
-    
-    return abstract, content
-
+    return abstract  # Only returning the abstract
 
 def scrape_papers(url):
     response = requests.get(url)
@@ -39,8 +25,8 @@ def scrape_papers(url):
     soup = BeautifulSoup(response.content, 'html.parser')
     papers = []
     
-    # Gather all anchors with arXiv links and process only the first 2 for testing
-    arxiv_anchors = [anchor for anchor in soup.find_all('a') if 'arXiv' in anchor.text][:2]
+    # Gather all anchors with arXiv links
+    arxiv_anchors = [anchor for anchor in soup.find_all('a') if 'arXiv' in anchor.text]
     
     for anchor in arxiv_anchors:
         title = anchor.find_previous('dt').text.strip()
@@ -49,9 +35,9 @@ def scrape_papers(url):
         # Extract the arXiv ID from the URL
         arxiv_id = link.split('/')[-1]
         
-        # Get the abstract and content using the arXiv API
-        abstract, content = get_abstract_and_content_from_arxiv(arxiv_id)
-        papers.append({'title': title, 'url': link, 'abstract': abstract, 'content': content})
+        # Get the abstract using the arXiv API
+        abstract = get_abstract_from_arxiv(arxiv_id)
+        papers.append({'title': title, 'url': link, 'abstract': abstract})
 
     return papers
 
@@ -59,9 +45,10 @@ url = "https://openaccess.thecvf.com/ICCV2023?day=all"
 papers = scrape_papers(url)
 
 df = pd.DataFrame(papers)
-df.to_csv('papers_with_abstracts_and_content.csv', index=False)
+df.to_csv('papers_with_abstracts.csv', index=False)  # File name changed to reflect content
 
-print(f"Scraped {len(papers)} papers with abstracts and content and saved to 'papers_with_abstracts_and_content.csv'")
+print(f"Scraped {len(papers)} papers with abstracts and saved to 'papers_with_abstracts.csv'")
+
 
 
 #all in one script
