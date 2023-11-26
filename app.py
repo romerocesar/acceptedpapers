@@ -5,17 +5,30 @@ import pandas as pd
 
 from scrapers import ICCVScraper
 from fetchers import ArxivFetcher
+from store import EmbeddingStorage 
+import os
+
+# Initialize the EmbeddingStorage
+embedding_storage = EmbeddingStorage(
+    os.environ.get("WEAVIATE_CLUSTER_URL"),
+    os.environ.get("WEAVIATE_API_KEY"),
+    os.environ.get("OPENAI_API_KEY")
+)
 
 logger = logging.getLogger('accepted_papers')
 
 # set page config
 st.set_page_config(page_title="Accepted conference papers", layout="wide")
 
-# sidebar for user inputs
-st.sidebar.title("Accepted conference papers")
+
+# Sidebar for user inputs - Semantic Search
+st.sidebar.title("ML Conference Paper Scraper")
 st.sidebar.markdown("### Instructions")
-st.sidebar.markdown("* Enter the URL of the conference.")
-conference_url = st.sidebar.text_input("Conference URL")  # TODO: do this async and update a db rather than scraping every time
+st.sidebar.markdown("* Enter the URL of the conference for scraping.")
+st.sidebar.markdown("* Use the search field to find papers semantically.")
+conference_url = st.sidebar.text_input("Conference URL")
+search_query = st.sidebar.text_input("Semantic Search Papers")
+
 
 # Main area
 st.markdown("""
@@ -43,17 +56,51 @@ if st.sidebar.button("Scrape Papers"):
         with st.spinner('Scraping papers...'):
             df = scrape_and_display(conference_url)
             st.success('Scraping complete!')
-    else:
-        st.warning("Please enter the conference URL.")
+            # Process and store papers
+            papers = df.to_dict('records')
+            abstracts = [paper['abstract'] for paper in papers]
+            embeddings = embedding_storage.generate_embeddings(abstracts)
+            embedding_storage.store_papers(papers, embeddings)
+            st.success('Papers stored in database!')
 
-# Search functionality
-if 'df' in locals():
-    search_query = st.sidebar.text_input("Search Papers")
-    if search_query:
-        search_results = df[df['title'].str.contains(search_query, case=False)]
-        st.dataframe(search_results)
+# Semantic search functionality
+if search_query:
+    with st.spinner("Searching for papers..."):
+        search_results = embedding_storage.semantic_search(search_query)
+        
+        # Debug line: print the raw search results
+        st.write("Raw Search Results:", search_results)
+
+        if search_results:
+            # Format and display search results (update this after inspecting the raw results)
+            formatted_results = ...
+            st.write("Formatted Search Results:", formatted_results)
+        else:
+            st.warning("No relevant papers found.")
+
+# Simple Check for Data Storage
+if st.sidebar.button("Check Stored Papers"):
+    query = """
+    {
+      Paper(limit: 5) {
+        title
+        url
+      }
+    }
+    """
+    results = embedding_storage.client.query.raw(query)
+    if results.get('data'):
+        stored_papers = results['data']['Paper']
+        st.write("Stored Papers:", stored_papers)
     else:
-        st.dataframe(df)
+        st.warning("No papers found in the database.")
+
+# Sample query for embedding inspection
+sample_query = "machine learning"
+sample_query_embedding = embedding_storage.embeddings.embed_query(sample_query)
+st.write("Sample Query Embedding:", sample_query_embedding)
+
+
 
 # Additional notes or footer
 st.markdown("---")
