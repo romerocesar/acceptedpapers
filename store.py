@@ -1,10 +1,14 @@
+import logging
 import os
+
 import weaviate
 from langchain.embeddings.openai import OpenAIEmbeddings
 from dotenv import load_dotenv
-import logging
+
+logger = logging.getLogger('papers')
 
 load_dotenv()
+
 
 class EmbeddingStorage:
     def __init__(self, weaviate_url, weaviate_api_key, openai_api_key):
@@ -14,7 +18,7 @@ class EmbeddingStorage:
 
     def _create_schema(self):
         schema = self.client.schema.get()
-        
+
         # Check if the schema is empty or uninitialized
         if 'classes' not in schema:
             schema['classes'] = []
@@ -56,14 +60,14 @@ class EmbeddingStorage:
         for class_info in classes:
             class_name = class_info['class']
             self.client.schema.delete_class(class_name)
-        
+
     def semantic_search(self, query_text, limit=1):
         # Convert the query text into an embedding
         query_embedding = self.embeddings.embed_query(query_text)
 
         # Perform a semantic search in Weaviate using nearVector
         results = self.client.query.get(
-            "Paper", 
+            "Paper",
             ["title", "url", "abstract"]
         ).with_near_vector({
             "vector": query_embedding,

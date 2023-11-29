@@ -1,12 +1,12 @@
 import logging
+import os
 
 import streamlit as st
 import pandas as pd
 
 from scrapers import ICCVScraper
 from fetchers import ArxivFetcher
-from store import EmbeddingStorage 
-import os
+from store import EmbeddingStorage
 
 # Initialize the EmbeddingStorage
 embedding_storage = EmbeddingStorage(
@@ -67,7 +67,7 @@ if st.sidebar.button("Scrape Papers"):
 if search_query:
     with st.spinner("Searching for papers..."):
         search_results = embedding_storage.semantic_search(search_query)
-        
+
         # Debug line: print the raw search results
         st.write("Raw Search Results:", search_results)
 
