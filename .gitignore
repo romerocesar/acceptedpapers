@@ -1,7 +1,8 @@
 # Virtual Environment
 venv/
+.venv/
 
-# Python cache files
+# python files
 __pycache__/
 *.pyc
 *.pyo
@@ -11,3 +12,6 @@ build/
 
 # VS Code settings
 .vscode/
+
+# environment variables
+.env
