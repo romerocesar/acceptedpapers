@@ -100,9 +100,6 @@ sample_query = "machine learning"
 sample_query_embedding = embedding_storage.embeddings.embed_query(sample_query)
 st.write("Sample Query Embedding:", sample_query_embedding)
 
-
-
 # Additional notes or footer
 st.markdown("---")
-st.markdown("Developed by [Your Name or Organization]")
-st.markdown("© 2023 All Rights Reserved")
+st.markdown("Developed by alessandro amenta and cesar romero")

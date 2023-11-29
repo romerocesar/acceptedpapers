@@ -1,9 +1,9 @@
 import logging
 import os
 
-import weaviate
-from langchain.embeddings.openai import OpenAIEmbeddings
 from dotenv import load_dotenv
+from langchain.embeddings.openai import OpenAIEmbeddings
+import weaviate
 
 logger = logging.getLogger('papers')
 
@@ -11,7 +11,10 @@ load_dotenv()
 
 
 class EmbeddingStorage:
+    '''TODO: rename this class to something specific to weaviate'''
+
     def __init__(self, weaviate_url, weaviate_api_key, openai_api_key):
+        '''TODO: use named arguments'''
         self.client = weaviate.Client(url=weaviate_url, auth_client_secret=weaviate.AuthApiKey(weaviate_api_key))
         self.embeddings = OpenAIEmbeddings(api_key=openai_api_key)
         self._create_schema()
@@ -41,7 +44,7 @@ class EmbeddingStorage:
             self.client.schema.create_class(paper_schema)
 
     def generate_embeddings(self, abstracts):
-        # Embedding a list of abstracts (documents)
+        '''TODO: why is the embedding store responsible for generating embeddings?'''
         return self.embeddings.embed_documents(abstracts)
 
     def store_papers(self, papers, embeddings):
